@@ -1,13 +1,18 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { QueryOrderDto } from './dto/query-order.dto';
+import { CachedOrder } from './interfaces/order.interface';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async createOrder(userId: string, createOrderDto: CreateOrderDto) {
     const { items } = createOrderDto;
@@ -31,7 +36,7 @@ export class OrdersService {
       total += Number(product.price) * orderItem.quantity;
     });
 
-    return this.prisma.$transaction(async (tx) => {
+    const order = await this.prisma.$transaction(async (tx) => {
       // Create order and order items
       const order = await tx.order.create({
         data: {
@@ -73,6 +78,32 @@ export class OrdersService {
 
       return order;
     });
+
+    // Add to Redis queue for processing
+    await this.redisService.addOrderToQueue({ order, userId });
+    
+    // Cache order details
+    const cachedOrder: CachedOrder = {
+      id: order.id,
+      userId: order.userId,
+      total: Number(order.total),
+      status: order.status,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      orderItems: order.orderItems.map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+        product: {
+          id: item.product.id,
+          title: item.product.title,
+          price: Number(item.product.price),
+        },
+      })),
+    };
+
+    await this.redisService.cacheOrderDetails(order.id, cachedOrder);
+
+    return order;
   }
 
   async getOrders(userId: string, query: QueryOrderDto) {
@@ -115,6 +146,13 @@ export class OrdersService {
   }
 
   async getOrderById(orderId: string, userId: string) {
+    // Try to get from cache first
+    const cachedOrder = await this.redisService.getCachedOrderDetails(orderId);
+    if (cachedOrder && cachedOrder.userId === userId) {
+      return cachedOrder as CachedOrder;
+    }
+
+    // If not in cache, get from database
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
       include: {
@@ -129,6 +167,9 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
+
+    // Cache the result
+    await this.redisService.cacheOrderDetails(orderId, order as unknown as CachedOrder);
 
     return order;
   }

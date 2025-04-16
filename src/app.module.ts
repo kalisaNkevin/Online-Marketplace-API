@@ -7,16 +7,14 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProductsModule } from './features/products/products.module';
 import { UploadsModule } from './features/uploads/uploads.module';
-import { RatingsModule } from './features/ratings/ratings.module';
-import { SubscriptionsModule } from './features/subscriptions/subscriptions.module';
-import { CartModule } from './features/cart/cart.module';
 import { PaymentsModule } from './features/payments/payments.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
-import { Store } from 'express-session';
 import { StoresModule } from './features/stores/stores.module';
 import { CategoryModule } from './features/categories/categories.module';
+import { ReviewsModule } from './features/reviews/reviews.module';
+import { CheckoutModule } from './features/checkout/checkout.module';
 
 @Module({
   imports: [
@@ -24,14 +22,13 @@ import { CategoryModule } from './features/categories/categories.module';
     AuthModule,
     UsersModule,
     ProductsModule,
-    SubscriptionsModule,
     UploadsModule,
-    RatingsModule,
-    CartModule,
     StoresModule,
     CategoryModule,
     PaymentsModule,
     PrismaModule,
+    CheckoutModule,
+    ReviewsModule,
     CacheModule.register({
       ttl: 60 * 60, // 1 hour
     }),
