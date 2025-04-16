@@ -1,131 +1,242 @@
-# JABO COLLECTION API
+# Online Marketplace API
 
-A RESTful API backend for Jabo Collection, an e-commerce platform specialized in premium sneaker sales and collection management.
+A robust e-commerce platform built with NestJS, featuring real-time order processing, payment integration, and advanced caching.
 
-## Features
+## 🚀 Features
 
-- 🔐 Authentication & Authorization
-- 👟 Product Management
-- 📦 Order Processing
-- 🛒 Shopping Cart
-- ⭐ Rating & Reviews
-- 📸 Image Upload
-- 💳 Subscription Management
-- 📊 Swagger API Documentation
+- **Authentication & Authorization**
+  - JWT-based authentication
+  - Role-based access control (Admin, Seller, Shopper)
+  - Password reset functionality
+  - Refresh token mechanism
 
-[![](https://mermaid.ink/img/pako:eNqtVk1z2jAQ_SsazeRGMoaYAL6loZ1hcigDyaXDRZUW0MSWXFmGEuC_d-UPwJiEkoQDWPueVm-_ZNaUawE0oGD6ks0MiyaK4Oc5AUM2m-trvSZjqw2QgOilSuroTyNwEZA4ZBxO4CNYSFgiYWmkPUV4YMYiPGeI5Wh-YAEPjRYpdww9nYIpHDwwCzNtVnUWzxH5Cjt_JXioeGAhQvaEsjgGZhIi1YSepDt9e7YQIIjVb3B3wU6oAQ5ygSKOmFtkbjb7ABz3N4RazZLCb87P8-r8bqqSuVaWybIUe9rh8Vky8zwZWzo5CGTvI6ddXZHvykq7In2YSiWt1JVar_NnXD0P-kQKMnwsLWNrpJoRiJgMyfOxOWZJstRGHJkVi6A0jXQIxODXEcfA1EAyf9IvoGpQArYCfNPogCkik3tuMe2lvY9pfpIREG4AH8W9rSFpLA6RbbUL34k8s6SYnoEgPx7fibAwCUi4kbHL7RfI2zXQ-do4LfXS1ORsj-flXOyJy1Al-MxcTODqVFqwx8L_yQtwGbGQxEbyHX2gLBEy4TpV9tCGMvhLrRHU-NBcOmQLMGwGI2bx5C-oQj5-FzdJtm1smU0TlO9-joVabVlYGodsFYGyxYb4cFWbtwwbAV6VoDichrHAC4kKvioB2a1yLgk6Y9a6Jc6brQK4qv5JWXYjnWyJeztMDcdbDmpTYezl5fjUGBaX6rlDuSN-PPqPKyxeChcn5U19b1TTyTaVuSqajuvINd2nQqENOjNS0MCaFBo0AoPvG1zSLKwJtXPA-5a6l6mAKUtD696kW9wWM_VL66jcaXQ6m9NgysIEV_lBxT-fHQUUxvbgrhka9Pxu5oMGa_qXBs1u66Z563m9ZufWa3W7Pb9BVzTwbprtXqvT9u46nt_2mu1ua9ugr9m53k3Pv-v5Hd-_85t-C7HtP7zh7lg?type=png)](https://mermaid.live/edit#pako:eNqtVk1z2jAQ_SsazeRGMoaYAL6loZ1hcigDyaXDRZUW0MSWXFmGEuC_d-UPwJiEkoQDWPueVm-_ZNaUawE0oGD6ks0MiyaK4Oc5AUM2m-trvSZjqw2QgOilSuroTyNwEZA4ZBxO4CNYSFgiYWmkPUV4YMYiPGeI5Wh-YAEPjRYpdww9nYIpHDwwCzNtVnUWzxH5Cjt_JXioeGAhQvaEsjgGZhIi1YSepDt9e7YQIIjVb3B3wU6oAQ5ygSKOmFtkbjb7ABz3N4RazZLCb87P8-r8bqqSuVaWybIUe9rh8Vky8zwZWzo5CGTvI6ddXZHvykq7In2YSiWt1JVar_NnXD0P-kQKMnwsLWNrpJoRiJgMyfOxOWZJstRGHJkVi6A0jXQIxODXEcfA1EAyf9IvoGpQArYCfNPogCkik3tuMe2lvY9pfpIREG4AH8W9rSFpLA6RbbUL34k8s6SYnoEgPx7fibAwCUi4kbHL7RfI2zXQ-do4LfXS1ORsj-flXOyJy1Al-MxcTODqVFqwx8L_yQtwGbGQxEbyHX2gLBEy4TpV9tCGMvhLrRHU-NBcOmQLMGwGI2bx5C-oQj5-FzdJtm1smU0TlO9-joVabVlYGodsFYGyxYb4cFWbtwwbAV6VoDichrHAC4kKvioB2a1yLgk6Y9a6Jc6brQK4qv5JWXYjnWyJeztMDcdbDmpTYezl5fjUGBaX6rlDuSN-PPqPKyxeChcn5U19b1TTyTaVuSqajuvINd2nQqENOjNS0MCaFBo0AoPvG1zSLKwJtXPA-5a6l6mAKUtD696kW9wWM_VL66jcaXQ6m9NgysIEV_lBxT-fHQUUxvbgrhka9Pxu5oMGa_qXBs1u66Z563m9ZufWa3W7Pb9BVzTwbprtXqvT9u46nt_2mu1ua9ugr9m53k3Pv-v5Hd-_85t-C7HtP7zh7lg)
+- **Product Management**
+  - CRUD operations
+  - Category organization
+  - Image upload with cloud storage
+  - Search and filtering
+  - Caching for improved performance
 
-## Tech Stack
+- **Order Processing**
+  - Real-time order updates
+  - Redis-based queue system
+  - Email notifications
+  - Order status tracking
 
-- Node.js
-- NestJS
-- TypeScript
-- PostgreSQL
-- TypeORM
-- JWT Authentication
-- Swagger/OpenAPI
+- **Shopping Experience**
+  - Cart management
+  - Wishlist functionality
+  - Product reviews and ratings
+  - Payment processing (PayPack integration)
 
-## Prerequisites
+## 🏗 System Architecture
 
-- Node.js (v16 or higher)
-- npm or yarn
-- PostgreSQL
-
-## Installation
-
-```bash
-# Install dependencies
-$ yarn install
-
-# Set up environment variables
-$ cp .env.example .env
+```mermaid
+graph TD
+    Client[Client Applications] -->|HTTP/REST| API[API Gateway]
+    API -->|Auth| Auth[Authentication]
+    API -->|Products| PM[Product Management]
+    API -->|Orders| OM[Order Management]
+    API -->|Users| UM[User Management]
+    
+    PM -->|Cache| Redis[(Redis Cache)]
+    OM -->|Queue| RQ[(Redis Queue)]
+    
+    PM --> DB[(PostgreSQL)]
+    OM --> DB
+    UM --> DB
+    Auth --> DB
 ```
 
-## Configuration
+## 🗄 Database Schema
 
-Create a `.env` file in the root directory and add:
+```mermaid
+erDiagram
+    User ||--o{ Store : "owns"
+    User ||--o{ Order : "places"
+    User ||--o{ Review : "writes"
+    User ||--o{ Cart : "has"
+
+    Store ||--o{ Product : "offers"
+    Category ||--o{ Product : "categorizes"
+
+    Product ||--o{ OrderItem : "appears in"
+    Product ||--o{ CartItem : "added to"
+    Product ||--o{ Review : "receives"
+
+    Order ||--|{ OrderItem : "contains"
+    Cart ||--|{ CartItem : "contains"
+```
+
+## 🛠 Prerequisites
+
+- Node.js v16 or higher
+- PostgreSQL 14+
+- Redis 6+
+- npm or yarn
+- Git
+
+## ⚙️ Installation
+
+1. **Clone the repository**
+
+```bash
+git clone https://github.com/yourusername/online-marketplace-api.git
+cd online-marketplace-api
+```
+
+2. **Install dependencies**
+
+```bash
+npm install
+```
+
+3. **Set up environment variables**
+
+```bash
+cp .env.example .env
+```
+
+4. **Configure your .env file**
 
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/jabo_collection
-JWT_SECRET=your_jwt_secret
-PORT=3000
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/marketplace"
+
+# JWT
+JWT_SECRET="your-super-secret-key"
+JWT_EXPIRATION="1h"
+JWT_REFRESH_SECRET="your-refresh-secret-key"
+JWT_REFRESH_EXPIRATION="7d"
+
+# Redis
+REDIS_HOST="localhost"
+REDIS_PORT=6379
+
+# Email
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-specific-password"
+
+# PayPack (Payment)
+PAYPACK_API_KEY="your-paypack-api-key"
+PAYPACK_SECRET_KEY="your-paypack-secret-key"
 ```
 
-## Running the Application
+5. **Set up the database**
 
 ```bash
-# Development mode
-$ yarn run start
+# Generate Prisma client
+npx prisma generate
 
-# Watch mode (recommended for development)
-$ yarn run start:dev
-
-# Production mode
-$ yarn run start:prod
+# Run migrations
+npx prisma migrate dev
 ```
 
-## API Documentation
+## 🚀 Running the Application
 
-Once the application is running, you can access the Swagger documentation at:
+```bash
+# Development
+npm run start:dev
 
+# Production
+npm run build
+npm run start:prod
+
+# Watch mode
+npm run start:debug
 ```
-http://localhost:3000/api
-```
 
-## Testing
+## 🧪 Testing
 
 ```bash
 # Unit tests
-$ yarn run test
+npm run test
 
 # E2E tests
-$ yarn run test:e2e
+npm run test:e2e
 
 # Test coverage
-$ yarn run test:cov
+npm run test:cov
 ```
 
-## API Endpoints
+## 📚 API Documentation
 
-### Auth
+Once running, access the Swagger documentation at:
 
-- POST /auth/login - User login
-- POST /auth/register - User registration
+```
+http://localhost:3000/api-docs
+```
 
-### Products
+### Key Endpoints
 
-- GET /products - List all products
-- POST /products - Create new product (Admin)
-- GET /products/:id - Get product details
-- PUT /products/:id - Update product (Admin)
-- DELETE /products/:id - Delete product (Admin)
+#### Authentication
 
-### Cart
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - User login
+- `POST /auth/refresh` - Refresh token
 
-- GET /cart - View cart
-- POST /cart/items - Add item to cart
-- DELETE /cart/items/:id - Remove item from cart
+#### Products
 
-### Orders
+- `GET /products` - List products
+- `POST /products` - Create product (Seller/Admin)
+- `GET /products/:id` - Get product details
+- `PATCH /products/:id` - Update product (Seller/Admin)
 
-- GET /orders - List user orders
-- POST /orders - Create new order
-- GET /orders/:id - Get order details
+#### Orders
 
-## Contributing
+- `POST /checkout` - Create order
+- `GET /orders` - List user orders
+- `GET /orders/:id` - Get order details
+- `PATCH /orders/:id/status` - Update order status (Seller/Admin)
+
+#### Reviews
+
+- `POST /products/:id/reviews` - Create review
+- `GET /products/:id/reviews` - Get product reviews
+- `PATCH /reviews/:id` - Update review
+- `DELETE /reviews/:id` - Delete review
+
+## 🔄 Queue Processing
+
+The application uses Redis for queue processing:
+
+1. **Start Redis** (if not running):
+
+```bash
+brew services start redis
+```
+
+2. **Monitor queues**:
+
+```bash
+redis-cli
+> MONITOR
+```
+
+## 🔍 Monitoring
+
+- API metrics: `http://localhost:3000/metrics`
+- Health check: `http://localhost:3000/health`
+- Queue dashboard: `http://localhost:3000/queues`
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## Stay in Touch
+## 📝 License
 
-- Author - [Kalisa Ngabo Kevin](https://kalisangabokevin.com)
-- LinkedIn - [Kalisa Kevin](https://www.linkedin.com/in/kalisa-ngabo-kevin-6717781b7)
-- Twitter - [@Kalisakevin_](https://twitter.com/Kalisakevin_)
+MIT License. See [LICENSE](LICENSE) for more information.
 
-## License
+## 👤 Author
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Kalisa Ngabo Kevin
+
+- Website: [kalisangabokevin.com](https://kalisangabokevin.com)
+- Twitter: [@Kalisakevin_](https://twitter.com/Kalisakevin_)
+- LinkedIn: [Kalisa Kevin](https://www.linkedin.com/in/kalisa-ngabo-kevin-6717781b7)
