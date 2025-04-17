@@ -1,64 +1,184 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  Request,
+  ParseUUIDPipe,
+  HttpStatus,
+  HttpCode,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { QueryProductDto } from './dto/query-product.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guards';
-import { SellerGuard } from 'src/auth/guards/seller.guard';
+import { SellerGuard } from '../../auth/guards/seller.guard';
+
+import { Role } from '@prisma/client';
+import { QueryProductDto } from './dto/query-product.dto';
+
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import {
+  PaginatedProductsResponse,
+  ProductResponseDto,
+} from './dto/product-response.dto';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @ApiTags('Products')
 @Controller('products')
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, SellerGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles([Role.SELLER])
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new product (Sellers only)' })
-  @ApiResponse({ status: 201, description: 'Product created successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Sellers only' })
-  async create(@Request() req, @Body() createProductDto: CreateProductDto) {
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Product created successfully',
+    type: ProductResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Forbidden - Sellers only',
+  })
+  async create(
+    @Request() req,
+    @Body() createProductDto: CreateProductDto,
+  ): Promise<ProductResponseDto> {
     return this.productsService.create(createProductDto, req.user.storeId);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all products with filtering and pagination' })
-  @ApiResponse({ status: 200, description: 'Returns paginated products' })
-  async findAll(@Query() query: QueryProductDto) {
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get all products with filtering and pagination.',
+    description: 'Search, filter and paginate through products',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Returns paginated products',
+    type: PaginatedProductsResponse,
+  })
+  async findAll(@Query() query: QueryProductDto): Promise<{
+    data: ProductResponseDto[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  }> {
     return this.productsService.findAll(query);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get product by ID' })
-  @ApiResponse({ status: 200, description: 'Returns a product' })
-  @ApiResponse({ status: 404, description: 'Product not found' })
-  async findOne(@Param('id') id: string) {
-    return this.productsService.findOne(id);
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get product by ID (Public)' })
+  @ApiParam({
+    name: 'id',
+    description: 'Product UUID',
+    type: 'string',
+    format: 'uuid',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Returns a product',
+    type: ProductResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Product not found',
+  })
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ProductResponseDto> {
+    const product = await this.productsService.findOne(id);
+    return {
+      ...product,
+      variants: product.variants.map((variant) => variant.size),
+    };
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, SellerGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles([Role.SELLER])
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update product (Sellers only)' })
-  @ApiResponse({ status: 200, description: 'Product updated successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Sellers only' })
-  @ApiResponse({ status: 404, description: 'Product not found' })
+  @ApiParam({
+    name: 'id',
+    description: 'Product UUID',
+    type: 'string',
+    format: 'uuid',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Product updated successfully',
+    type: ProductResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Forbidden - Sellers only',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Product not found',
+  })
   async update(
     @Request() req,
-    @Param('id') id: string, 
-    @Body() updateProductDto: UpdateProductDto
-  ) {
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateProductDto: UpdateProductDto,
+  ): Promise<ProductResponseDto> {
     return this.productsService.update(id, updateProductDto, req.user.storeId);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, SellerGuard)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete product (Sellers only)' })
-  @ApiResponse({ status: 200, description: 'Product deleted successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Sellers only' })
-  @ApiResponse({ status: 404, description: 'Product not found' })
-  async remove(@Request() req, @Param('id') id: string) {
+  @ApiParam({
+    name: 'id',
+    description: 'Product UUID',
+    type: 'string',
+    format: 'uuid',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Product deleted successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Forbidden - Sellers only',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Product not found',
+  })
+  async remove(
+    @Request() req,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ message: string }> {
     return this.productsService.remove(id, req.user.storeId);
   }
 }

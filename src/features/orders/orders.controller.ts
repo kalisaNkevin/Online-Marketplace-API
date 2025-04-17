@@ -1,28 +1,36 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
   UseGuards,
   Request,
   Query,
-  BadRequestException
+  BadRequestException,
+  ParseUUIDPipe,
+  HttpStatus,
+  HttpCode,
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
   ApiBearerAuth,
-  ApiQuery 
+  ApiQuery,
+  ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { QueryOrderDto } from './dto/query-order.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guards';
+import { OrderEntity } from './entities/order.entity';
 import { OrderStatus } from '@prisma/client';
+import { PaginatedOrdersResponse } from './interfaces/paginated-orders-response.interface';
+
 
 @ApiTags('Orders')
 @Controller('orders')
@@ -32,19 +40,22 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new order' })
+  @ApiBody({ type: CreateOrderDto })
   @ApiResponse({
-    status: 201,
+    status: HttpStatus.CREATED,
     description: 'Order has been successfully created',
+    type: OrderEntity,
   })
-  @ApiResponse({ 
-    status: 400, 
-    description: 'Bad request - Invalid order data or insufficient stock' 
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Bad request - Invalid order data or insufficient stock',
   })
   async createOrder(
     @Request() req,
-    @Body() createOrderDto: CreateOrderDto
-  ) {
+    @Body() createOrderDto: CreateOrderDto,
+  ): Promise<OrderEntity> {
     return await this.ordersService.createOrder(req.user.sub, createOrderDto);
   }
 
@@ -53,19 +64,17 @@ export class OrdersController {
   @ApiResponse({
     status: 200,
     description: 'Returns paginated list of orders',
+    type: PaginatedOrdersResponse,
   })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ 
-    name: 'status', 
-    required: false, 
+  @ApiQuery({
+    name: 'status',
+    required: false,
     enum: OrderStatus,
-    description: 'Filter orders by status' 
+    description: 'Filter orders by status',
   })
-  async getOrders(
-    @Request() req,
-    @Query() query: QueryOrderDto
-  ) {
+  async getOrders(@Request() req, @Query() query: QueryOrderDto) {
     return await this.ordersService.getOrders(req.user.sub, query);
   }
 
@@ -76,10 +85,7 @@ export class OrdersController {
     description: 'Returns order details',
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  async getOrderById(
-    @Request() req,
-    @Param('id') orderId: string
-  ) {
+  async getOrderById(@Request() req, @Param('id') orderId: string) {
     return await this.ordersService.getOrderById(orderId, req.user.sub);
   }
 
@@ -94,12 +100,12 @@ export class OrdersController {
   async updateOrderStatus(
     @Request() req,
     @Param('id') orderId: string,
-    @Body() updateOrderDto: UpdateOrderDto
+    @Body() updateOrderDto: UpdateOrderDto,
   ) {
     return await this.ordersService.updateOrderStatus(
       orderId,
       req.user.sub,
-      updateOrderDto
+      updateOrderDto,
     );
   }
 
@@ -111,10 +117,7 @@ export class OrdersController {
   })
   @ApiResponse({ status: 400, description: 'Order cannot be cancelled' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  async cancelOrder(
-    @Request() req,
-    @Param('id') orderId: string
-  ) {
+  async cancelOrder(@Request() req, @Param('id') orderId: string) {
     return await this.ordersService.cancelOrder(orderId, req.user.sub);
   }
 }

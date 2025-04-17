@@ -1,34 +1,38 @@
 import {
   Injectable,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { OrderStatus } from '@prisma/client';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { OrderStatus, Review, Prisma } from '@prisma/client';
+
+interface ReviewWithUser extends Review {
+  user: { name: string };
+}
 
 @Injectable()
 export class ReviewsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(
+  private calculateAverageRating(reviews: Review[]): number | null {
+    if (!reviews.length) return null;
+    const sum = reviews.reduce((acc, rev) => acc + rev.rating, 0);
+    return Number((sum / reviews.length).toFixed(1));
+  }
+
+  private async validateOrderAndProduct(
     userId: string,
     productId: string,
-    createReviewDto: CreateReviewDto,
-  ) {
-    const { orderId, rating, comment } = createReviewDto;
-
-    // Verify order exists and belongs to user
+    orderId: string,
+  ): Promise<void> {
     const order = await this.prisma.order.findFirst({
       where: {
         id: orderId,
         userId,
         status: OrderStatus.COMPLETED,
-        orderItems: {
-          some: {
-            productId,
-          },
-        },
+        orderItems: { some: { productId } },
       },
     });
 
@@ -38,21 +42,46 @@ export class ReviewsService {
       );
     }
 
-    // Check if review already exists
-    const existingReview = await this.prisma.review.findFirst({
+    const existingReview = await this.prisma.review.findUnique({
       where: {
-        userId,
-        productId,
-        orderId,
+        userId_productId_orderId: {
+          userId,
+          productId,
+          orderId,
+        },
       },
     });
 
     if (existingReview) {
       throw new BadRequestException('You have already reviewed this product');
     }
+  }
+
+  private async updateProductRating(
+    tx: Prisma.TransactionClient,
+    productId: string,
+  ): Promise<number | null> {
+    const reviews = await tx.review.findMany({ where: { productId } });
+    const averageRating = this.calculateAverageRating(reviews);
+
+    await tx.product.update({
+      where: { id: productId },
+      data: { averageRating },
+    });
+
+    return averageRating;
+  }
+
+  async create(
+    userId: string,
+    productId: string,
+    createReviewDto: CreateReviewDto,
+  ): Promise<ReviewWithUser> {
+    const { orderId, rating, comment } = createReviewDto;
+
+    await this.validateOrderAndProduct(userId, productId, orderId);
 
     return this.prisma.$transaction(async (tx) => {
-      // Create review with nested connects
       const review = await tx.review.create({
         data: {
           rating,
@@ -62,34 +91,11 @@ export class ReviewsService {
           order: { connect: { id: orderId } },
         },
         include: {
-          user: {
-            select: {
-              name: true,
-            },
-          },
-          product: {
-            select: {
-              title: true,
-            },
-          },
+          user: { select: { name: true } },
         },
       });
 
-      // Update product average rating
-      const reviews = await tx.review.findMany({
-        where: { productId },
-      });
-
-      const averageRating = Number(
-        (
-          reviews.reduce((acc, rev) => acc + rev.rating, 0) / reviews.length
-        ).toFixed(1),
-      );
-
-      await tx.product.update({
-        where: { id: productId },
-        data: { averageRating },
-      });
+      await this.updateProductRating(tx, productId);
 
       return review;
     });
@@ -99,107 +105,54 @@ export class ReviewsService {
     userId: string,
     reviewId: string,
     updateReviewDto: UpdateReviewDto,
-  ) {
+  ): Promise<ReviewWithUser> {
     const review = await this.prisma.review.findFirst({
-      where: {
-        id: reviewId,
-        userId,
-      },
+      where: { id: reviewId, userId },
     });
 
     if (!review) {
-      throw new BadRequestException('Review not found or not owned by user');
+      throw new NotFoundException('Review not found or not owned by user');
     }
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.review.update({
         where: { id: reviewId },
-        data: {
-          rating: updateReviewDto.rating,
-          comment: updateReviewDto.comment,
-        },
+        data: updateReviewDto,
         include: {
-          user: {
-            select: {
-              name: true,
-            },
-          },
-          product: {
-            select: {
-              title: true,
-            },
-          },
+          user: { select: { name: true } },
+          product: { select: { name: true } },
         },
       });
 
-      // Recalculate average rating
-      const reviews = await tx.review.findMany({
-        where: { productId: review.productId },
-      });
-
-      const averageRating = Number(
-        (reviews.reduce((acc, rev) => acc + rev.rating, 0) / reviews.length).toFixed(1),
-      );
-
-      await tx.product.update({
-        where: { id: review.productId },
-        data: { averageRating },
-      });
+      await this.updateProductRating(tx, review.productId);
 
       return updated;
     });
   }
 
-  async delete(userId: string, reviewId: string) {
+  async delete(userId: string, reviewId: string): Promise<{ message: string }> {
     const review = await this.prisma.review.findFirst({
-      where: {
-        id: reviewId,
-        userId,
-      },
+      where: { id: reviewId, userId },
     });
 
     if (!review) {
-      throw new BadRequestException('Review not found or not owned by user');
+      throw new NotFoundException('Review not found or not owned by user');
     }
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.review.delete({
-        where: { id: reviewId },
-      });
-
-      // Recalculate average rating
-      const reviews = await tx.review.findMany({
-        where: { productId: review.productId },
-      });
-
-      const averageRating = reviews.length
-        ? Number(
-            (reviews.reduce((acc, rev) => acc + rev.rating, 0) / reviews.length).toFixed(1),
-          )
-        : null;
-
-      await tx.product.update({
-        where: { id: review.productId },
-        data: { averageRating },
-      });
-
+      await tx.review.delete({ where: { id: reviewId } });
+      await this.updateProductRating(tx, review.productId);
       return { message: 'Review deleted successfully' };
     });
   }
 
-  async findProductReviews(productId: string) {
-    const reviews = await this.prisma.review.findMany({
+  async findProductReviews(productId: string): Promise<ReviewWithUser[]> {
+    return this.prisma.review.findMany({
       where: { productId },
       include: {
-        user: {
-          select: {
-            name: true,
-          },
-        },
+        user: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
-
-    return reviews;
   }
 }

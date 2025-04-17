@@ -1,16 +1,26 @@
-import { IsArray, IsString, IsInt, Min, ValidateNested } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import {
+  IsArray,
+  ValidateNested,
+  IsUUID,
+  IsNumber,
+  Min,
+} from 'class-validator';
 
-class OrderItemDto {
-  @IsString()
+export class OrderItemDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
   productId: string;
 
-  @IsInt()
+  @ApiProperty({ minimum: 1 })
+  @IsNumber()
   @Min(1)
   quantity: number;
 }
 
 export class CreateOrderDto {
+  @ApiProperty({ type: [OrderItemDto] })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)

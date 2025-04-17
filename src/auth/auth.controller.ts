@@ -6,6 +6,8 @@ import {
   Request,
   Delete,
   NotFoundException,
+  InternalServerErrorException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,12 +23,16 @@ import { JwtAuthGuard } from './guards/jwt-auth.guards';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
+import { Public } from './decorators/public.decorator';
+import { LogoutDto } from './dto/logout.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @Public()
   @Post('register')
   @ApiOperation({
     summary: 'Register a new user',
@@ -37,7 +43,36 @@ export class AuthController {
   @ApiResponse({
     status: 201,
     description: 'User successfully registered',
-    type: CreateUserDto,
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: {
+          type: 'number',
+          example: 201,
+        },
+        message: {
+          type: 'string',
+          example: 'User registration successful',
+        },
+        data: {
+          type: 'object',
+          properties: {
+            userId: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174000',
+            },
+            email: {
+              type: 'string',
+              example: 'user@example.com',
+            },
+            role: {
+              type: 'string',
+              example: 'SHOPPER',
+            },
+          },
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -46,11 +81,38 @@ export class AuthController {
   @ApiResponse({
     status: 409,
     description: 'Conflict - Email already exists',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: {
+          type: 'number',
+          example: 409,
+        },
+        message: {
+          type: 'string',
+          example: 'User with email user@example.com already exists',
+        },
+        error: {
+          type: 'string',
+          example: 'Conflict',
+        },
+      },
+    },
   })
   async register(@Body() createUserDto: CreateUserDto) {
-    return await this.authService.register(createUserDto);
+    const user = await this.authService.register(createUserDto);
+    return {
+      statusCode: 201,
+      message: 'User registration successful',
+      data: {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      },
+    };
   }
 
+  @Public()
   @Post('login')
   @ApiOperation({
     summary: 'Authenticate user',
@@ -61,66 +123,25 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Login successful',
-    schema: {
-      type: 'object',
-      properties: {
-        token: {
-          type: 'string',
-          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-          description: 'JWT access token',
-        },
-        refreshToken: {
-          type: 'string',
-          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-          description: 'JWT refresh token',
-        },
-      },
-    },
+    type: LoginResponseDto,
   })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized - Invalid credentials',
   })
   async login(@Body() loginUserDto: LoginUserDto) {
-    return await this.authService.login(loginUserDto);
+    const result = await this.authService.login(loginUserDto);
+    return {
+      statusCode: 200,
+      message: 'Login successful',
+      data: {
+        accessToken: result.token, // Rename token to accessToken
+        refreshToken: result.refreshToken,
+      },
+    };
   }
 
-  @Post('forgot-password')
-  @ApiOperation({
-    summary: 'Request password reset',
-    description: 'Send password reset instructions if email exists',
-  })
-  @ApiBody({ type: ForgotPasswordDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Reset instructions sent successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Email not found in database',
-  })
-  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    const userExists = await this.authService.checkEmailExists(forgotPasswordDto.email);
-    
-    if (!userExists) {
-      throw new NotFoundException('No account found with this email address');
-    }
-
-    return await this.authService.forgotPassword(forgotPasswordDto.email);
-  }
-
-  @Post('reset-password')
-  @ApiOperation({
-    summary: 'Reset password',
-    description: 'Reset password using token received via email',
-  })
-  @ApiBody({ type: ResetPasswordDto })
-  @ApiResponse({ status: 200, description: 'Password reset successful' })
-  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    return await this.authService.resetPassword(resetPasswordDto);
-  }
-
+  @Public()
   @Post('refresh')
   @ApiOperation({
     summary: 'Refresh access token',
@@ -154,16 +175,25 @@ export class AuthController {
     return await this.authService.refreshToken(refreshTokenDto.refreshToken);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Delete('logout')
+  @Public()
+  @Post('logout')
   @ApiOperation({
     summary: 'Logout user',
-    description: 'Invalidate the refresh token',
+    description: 'Invalidate refresh token and clear user session',
   })
-  @ApiBearerAuth('JWT-auth')
-  @ApiResponse({ status: 200, description: 'Logout successful' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async logout(@Request() req) {
-    return await this.authService.logout(req.user.sub);
+  @ApiBody({ type: LogoutDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Logout successful',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 200 },
+        message: { type: 'string', example: 'Logout successful' },
+      },
+    },
+  })
+  async logout(@Body() logoutDto: LogoutDto) {
+    return await this.authService.logout(logoutDto.refreshToken);
   }
 }

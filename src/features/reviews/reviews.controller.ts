@@ -8,6 +8,9 @@ import {
   Delete,
   UseGuards,
   Request,
+  ParseUUIDPipe,
+  HttpStatus,
+  HttpCode,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,36 +18,51 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
 
+import { ReviewEntity } from './entities/review.entity';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
 
 @ApiTags('Reviews')
 @Controller('products/:productId/reviews')
+@ApiResponse({
+  status: HttpStatus.UNAUTHORIZED,
+  description: 'Unauthorized - JWT token missing or invalid',
+})
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Create a product review' })
-  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new review for a product' })
+  @ApiParam({
+    name: 'productId',
+    description: 'UUID of the product',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiBody({ type: CreateReviewDto })
   @ApiResponse({
-    status: 201,
-    description: 'Review has been successfully created',
+    status: HttpStatus.CREATED,
+    description: 'Review created successfully',
+    type: ReviewEntity,
   })
   @ApiResponse({
-    status: 400,
-    description: 'Bad request - Invalid review data or not eligible to review',
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid review data or user not eligible to review',
   })
-  async create(
+  async createReview(
     @Request() req,
-    @Param('productId') productId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
     @Body() createReviewDto: CreateReviewDto,
-  ) {
+  ): Promise<ReviewEntity> {
     return await this.reviewsService.create(
       req.user.sub,
       productId,
@@ -53,35 +71,60 @@ export class ReviewsController {
   }
 
   @Get()
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get all reviews for a product' })
-  @ApiParam({ name: 'productId', description: 'Product ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns all reviews for the product',
+  @ApiParam({
+    name: 'productId',
+    description: 'UUID of the product',
+    type: 'string',
+    format: 'uuid',
+    required: true,
   })
-  async findProductReviews(@Param('productId') productId: string) {
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of reviews retrieved successfully',
+    type: [ReviewEntity],
+  })
+  async getProductReviews(
+    @Param('productId', ParseUUIDPipe) productId: string,
+  ): Promise<ReviewEntity[]> {
     return await this.reviewsService.findProductReviews(productId);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Update a review' })
-  @ApiParam({ name: 'productId', description: 'Product ID' })
-  @ApiParam({ name: 'id', description: 'Review ID' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update an existing review' })
+  @ApiParam({
+    name: 'productId',
+    description: 'UUID of the product',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the review',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiBody({ type: UpdateReviewDto })
   @ApiResponse({
-    status: 200,
-    description: 'Review has been successfully updated',
+    status: HttpStatus.OK,
+    description: 'Review updated successfully',
+    type: ReviewEntity,
   })
   @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Not review owner',
+    status: HttpStatus.NOT_FOUND,
+    description: 'Review not found or not owned by user',
   })
-  async update(
+  async updateReview(
     @Request() req,
-    @Param('id') reviewId: string,
+    @Param('id', ParseUUIDPipe) reviewId: string,
     @Body() updateReviewDto: UpdateReviewDto,
-  ) {
+  ): Promise<ReviewEntity> {
     return await this.reviewsService.update(
       req.user.sub,
       reviewId,
@@ -92,18 +135,34 @@ export class ReviewsController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a review' })
-  @ApiParam({ name: 'productId', description: 'Product ID' })
-  @ApiParam({ name: 'id', description: 'Review ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Review has been successfully deleted',
+  @ApiParam({
+    name: 'productId',
+    description: 'UUID of the product',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the review',
+    type: 'string',
+    format: 'uuid',
+    required: true,
   })
   @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Not review owner',
+    status: HttpStatus.OK,
+    description: 'Review deleted successfully',
   })
-  async delete(@Request() req, @Param('id') reviewId: string) {
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Review not found or not owned by user',
+  })
+  async deleteReview(
+    @Request() req,
+    @Param('id', ParseUUIDPipe) reviewId: string,
+  ) {
     return await this.reviewsService.delete(req.user.sub, reviewId);
   }
 }

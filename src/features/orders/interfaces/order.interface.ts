@@ -3,17 +3,17 @@ import { OrderStatus } from '@prisma/client';
 export interface CachedOrder {
   id: string;
   userId: string;
-  status: OrderStatus;
   total: number;
+  status: OrderStatus;
+  createdAt: Date;
+  updatedAt: Date;
   orderItems: {
     id: string;
     quantity: number;
     product: {
       id: string;
-      title: string;
+      name: string;
       price: number;
     };
   }[];
-  createdAt: Date;
-  updatedAt: Date;
 }

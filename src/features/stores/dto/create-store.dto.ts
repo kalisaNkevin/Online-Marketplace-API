@@ -4,7 +4,7 @@ import { IsString, IsOptional } from 'class-validator';
 export class CreateStoreDto {
   @ApiProperty({
     example: 'Tech Haven',
-    description: 'Store name'
+    description: 'Store name',
   })
   @IsString()
   name: string;
@@ -12,7 +12,7 @@ export class CreateStoreDto {
   @ApiProperty({
     example: 'Your one-stop shop for all tech needs',
     description: 'Store description',
-    required: false
+    required: false,
   })
   @IsString()
   @IsOptional()

@@ -1,6 +1,6 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Processor('orders')
 export class OrderProcessor {
@@ -19,7 +19,7 @@ export class OrderProcessor {
 
       // Send notification logic here
       // You can implement email notifications here
-      
+
       return { success: true, orderId: order.id };
     } catch (error) {
       throw new Error(`Failed to process order: ${error}`);

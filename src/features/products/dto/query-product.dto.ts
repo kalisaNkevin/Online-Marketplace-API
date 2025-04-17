@@ -1,105 +1,68 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, Min, IsUUID, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, IsNumber, Min, IsEnum } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class QueryProductDto {
-  @ApiProperty({
-    required: false,
-    description: 'Search term for product title or description'
+  @ApiPropertyOptional({
+    description: 'Search products by name or description',
   })
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiProperty({
-    required: false,
-    description: 'Filter by store ID'
+  @ApiPropertyOptional({
+    description: 'Filter by category ID',
   })
   @IsOptional()
-  @IsUUID()
-  storeId?: string;
-
-  @ApiProperty({
-    required: false,
-    description: 'Filter by category ID'
-  })
-  @IsOptional()
-  @IsUUID()
+  @IsString()
   categoryId?: string;
 
-  @ApiProperty({
-    required: false,
-    description: 'Filter by in stock status'
+  @ApiPropertyOptional({
+    description: 'Minimum price filter',
   })
   @IsOptional()
-  @IsBoolean()
-  @Type(() => Boolean)
-  inStock?: boolean;
-
-  @ApiProperty({
-    required: false,
-    minimum: 0,
-    description: 'Minimum price filter'
-  })
-  @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   @Min(0)
+  @Transform(({ value }) => parseFloat(value))
   minPrice?: number;
 
-  @ApiProperty({
-    required: false,
-    minimum: 0,
-    description: 'Maximum price filter'
+  @ApiPropertyOptional({
+    description: 'Maximum price filter',
   })
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   @Min(0)
+  @Transform(({ value }) => parseFloat(value))
   maxPrice?: number;
 
-  @ApiProperty({
-    required: false,
-    minimum: 0,
-    description: 'Minimum rating filter'
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  minRating?: number;
-
-  @ApiProperty({
-    required: false,
-    minimum: 1,
+  @ApiPropertyOptional({
+    description: 'Page number for pagination',
     default: 1,
-    description: 'Page number'
+    minimum: 1,
   })
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Transform(({ value }) => parseInt(value))
   page?: number = 1;
 
-  @ApiProperty({
-    required: false,
-    minimum: 1,
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
     default: 10,
-    description: 'Items per page'
+    minimum: 1,
   })
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Transform(({ value }) => parseInt(value))
   limit?: number = 10;
 
-  @ApiProperty({ required: false, enum: ['createdAt', 'price', 'averageRating'] })
+  @ApiPropertyOptional({
+    description: 'Sort order',
+    enum: ['asc', 'desc'],
+    default: 'desc',
+  })
   @IsOptional()
-  @IsString()
-  sortBy?: string = 'createdAt';
-
-  @ApiProperty({ required: false, enum: ['asc', 'desc'] })
-  @IsOptional()
-  @IsString()
+  @IsEnum(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'desc';
 }

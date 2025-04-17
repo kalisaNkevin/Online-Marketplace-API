@@ -12,9 +12,7 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(PrismaService.name);
-    Subscription: any;
-    
-
+  Subscription: any;
 
   async onModuleInit() {
     try {

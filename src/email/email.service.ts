@@ -1,63 +1,71 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as sendgrid from '@sendgrid/mail';
 import { ConfigService } from '@nestjs/config';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
-  constructor(private readonly configService: ConfigService) {
-    sendgrid.setApiKey(this.configService.get('SENDGRID_API_KEY'));
-  }
+  constructor(
+    private readonly mailerService: MailerService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  async sendPasswordReset(email: string, token: string) {
+  async sendEmail(to: string, subject: string, html: string): Promise<void> {
     try {
-      this.logger.log(`Sending password reset email to ${email}`);
-      
-      const msg = {
-        to: email,
-        from: this.configService.get('SENDGRID_FROM_EMAIL'),
-        subject: 'Reset Your Password',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Password Reset Request</h2>
-            <p>You requested to reset your password. Use this token: ${token}</p>
-            <p>If you didn't request this, please ignore this email.</p>
-          </div>
-        `,
-      };
-
-      await sendgrid.send(msg);
-      this.logger.log(`Successfully sent password reset email to ${email}`);
+      await this.mailerService.sendMail({
+        to,
+        subject,
+        html,
+      });
+      this.logger.log(`Email sent successfully to ${to}`);
     } catch (error) {
-      this.logger.error(`Failed to send email to ${email}:`, error);
+      this.logger.error(`Failed to send email to ${to}: ${error}`);
       throw error;
     }
   }
 
-  async sendPasswordChangeConfirmation(email: string) {
-    try {
-      this.logger.log(`Sending password change confirmation to ${email}`);
-      
-      const msg = {
-        to: email,
-        from: this.configService.get('SENDGRID_FROM_EMAIL'),
-        subject: 'Password Changed Successfully',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Password Changed</h2>
-            <p>Your password has been successfully changed.</p>
-            <p>If you didn't make this change, please contact our support team immediately.</p>
-            <p>Time of change: ${new Date().toLocaleString()}</p>
-          </div>
-        `,
-      };
+  async sendVerificationEmail(email: string, token: string): Promise<void> {
+    const frontendUrl = this.configService.get('FRONTEND_URL');
+    await this.sendEmail(
+      email,
+      'Verify Your Email',
+      `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Email Verification</h2>
+          <p>Please verify your email address by clicking the link below:</p>
+          <a href="${frontendUrl}/verify-email?token=${token}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+            Verify Email
+          </a>
+        </div>
+      `,
+    );
+  }
 
-      await sendgrid.send(msg);
-      this.logger.log(`Successfully sent password change confirmation to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send password change confirmation to ${email}:`, error);
-      throw error;
-    }
+  async sendWelcomeEmail(email: string) {
+    await this.sendEmail(
+      email,
+      'Welcome to Our Service',
+      `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Welcome!</h2>
+          <p>Thank you for joining us. We are excited to have you on board.</p>
+        </div>
+      `,
+    );
+  }
+
+  async sendOrderConfirmation(email: string, orderDetails: any) {
+    await this.sendEmail(
+      email,
+      'Order Confirmation',
+      `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Order Confirmation</h2>
+          <p>Thank you for your order! Here are your order details:</p>
+          <pre>${JSON.stringify(orderDetails, null, 2)}</pre>
+        </div>
+      `,
+    );
   }
 }

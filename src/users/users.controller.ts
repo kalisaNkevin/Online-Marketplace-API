@@ -1,26 +1,28 @@
-import { 
-  Controller, 
-  Get, 
-  Put, 
-  Delete, 
+import {
+  Controller,
+  Get,
+  Put,
+  Delete,
   UseGuards,
   Patch,
   Request,
   ForbiddenException,
   Param,
-  Body
+  Body,
+  HttpStatus,
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
   ApiBearerAuth,
-  ApiParam 
+  ApiParam,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guards';
 import { Role } from '@prisma/client';
+import { UserProfileEntity } from 'src/features/users/entities/user-profile.entity';
 
 @ApiTags('Users')
 @Controller('users')
@@ -32,9 +34,17 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({ status: 200, description: 'User profile data' })
-  async getProfile(@Request() req) {
-    return this.usersService.findById(req.user.sub);
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User profile data',
+    type: UserProfileEntity,
+  })
+  async getProfile(@Request() req): Promise<UserProfileEntity> {
+    const user = await this.usersService.findById(req.user.sub);
+    const {
+      ...profile
+    } = user;
+    return profile;
   }
 
   @Put('profile')
@@ -44,7 +54,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   async updateProfile(
     @Request() req,
-    @Body() updateProfileDto: UpdateProfileDto
+    @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(req.user.sub, updateProfileDto);
   }

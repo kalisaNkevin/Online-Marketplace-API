@@ -1,148 +1,177 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { QueryOrderDto } from './dto/query-order.dto';
 import { CachedOrder } from './interfaces/order.interface';
+import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
   ) {}
 
-  async createOrder(userId: string, createOrderDto: CreateOrderDto) {
-    const { items } = createOrderDto;
-
-    // Check if all products exist and have enough stock
+  private async validateProducts(items: CreateOrderDto['items']) {
     const products = await this.prisma.product.findMany({
-      where: { id: { in: items.map(item => item.productId) } }
+      where: { id: { in: items.map((item) => item.productId) } },
     });
 
     if (products.length !== items.length) {
       throw new BadRequestException('One or more products not found');
     }
 
-    // Calculate total and validate stock
     let total = 0;
-    products.forEach(product => {
-      const orderItem = items.find(item => item.productId === product.id);
-      if (product.stock < orderItem.quantity) {
-        throw new BadRequestException(`Insufficient stock for product: ${product.title}`);
+    products.forEach((product) => {
+      const orderItem = items.find((item) => item.productId === product.id);
+      if (!orderItem) return;
+
+      if (product.quantity < orderItem.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for product: ${product.name}`,
+        );
       }
       total += Number(product.price) * orderItem.quantity;
     });
 
-    const order = await this.prisma.$transaction(async (tx) => {
-      // Create order and order items
-      const order = await tx.order.create({
-        data: {
-          userId,
-          total,
-          orderItems: {
-            create: items.map(item => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              priceAtPurchase: products.find(p => p.id === item.productId).price
-            }))
-          }
-        },
-        include: {
-          orderItems: {
-            include: {
-              product: true
-            }
-          }
-        }
+    return { products, total };
+  }
+
+  private async updateProductStock(
+    tx: Prisma.TransactionClient,
+    items: CreateOrderDto['items'],
+    increment = false,
+  ) {
+    return Promise.all(
+      items.map((item) =>
+        tx.product.update({
+          where: { id: item.productId },
+          data: {
+            quantity: {
+              [increment ? 'increment' : 'decrement']: item.quantity,
+            },
+          },
+        }),
+      ),
+    );
+  }
+
+  async createOrder(
+    userId: string,
+    createOrderDto: CreateOrderDto,
+  ): Promise<CachedOrder> {
+    const { items } = createOrderDto;
+    const { products, total } = await this.validateProducts(items);
+
+    try {
+      const order = await this.prisma.$transaction(async (tx) => {
+        const order = await tx.order.create({
+          data: {
+            userId,
+            total: new Prisma.Decimal(total),
+            orderItems: {
+              create: items.map((item) => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                priceAtPurchase: products.find((p) => p.id === item.productId)
+                  ?.price,
+              })),
+            },
+          },
+          include: {
+            orderItems: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        });
+
+        await this.updateProductStock(tx, items);
+        return order;
       });
 
-      // Update product stock
-      await Promise.all(
-        items.map(async item =>
-          tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { decrement: item.quantity },
-              inStock: {
-                set: (await tx.product.findUnique({
-                  where: { id: item.productId }
-                })).stock - item.quantity > 0
-              }
-            }
-          })
-        )
-      );
+      const cachedOrder: CachedOrder = {
+        id: order.id,
+        userId: order.userId,
+        total: Number(order.total),
+        status: order.status,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        orderItems: order.orderItems.map((item) => ({
+          id: item.id,
+          quantity: item.quantity,
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            price: Number(item.priceAtPurchase),
+          },
+        })),
+      };
 
-      return order;
-    });
+      await Promise.all([
+        this.redisService.addOrderToQueue({ order, userId }),
+        this.redisService.cacheOrderDetails(order.id, cachedOrder),
+      ]);
 
-    // Add to Redis queue for processing
-    await this.redisService.addOrderToQueue({ order, userId });
-    
-    // Cache order details
-    const cachedOrder: CachedOrder = {
-      id: order.id,
-      userId: order.userId,
-      total: Number(order.total),
-      status: order.status,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-      orderItems: order.orderItems.map(item => ({
-        id: item.id,
-        quantity: item.quantity,
-        product: {
-          id: item.product.id,
-          title: item.product.title,
-          price: Number(item.product.price),
-        },
-      })),
-    };
-
-    await this.redisService.cacheOrderDetails(order.id, cachedOrder);
-
-    return order;
+      return cachedOrder;
+    } catch (error) {
+      this.logger.error(`Failed to create order: ${error}`, error);
+      throw new BadRequestException('Failed to create order');
+    }
   }
 
   async getOrders(userId: string, query: QueryOrderDto) {
     const { status, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
 
-    const where = { userId, ...(status && { status }) };
+    try {
+      const [orders, total] = await Promise.all([
+        this.prisma.order.findMany({
+          where: { userId, ...(status && { status }) },
+          skip,
+          take: limit,
+          include: {
+            orderItems: {
+              include: {
+                product: {
+                  select: {
+                    name: true,
+                    price: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.order.count({
+          where: { userId, ...(status && { status }) },
+        }),
+      ]);
 
-    const [orders, total] = await Promise.all([
-      this.prisma.order.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          orderItems: {
-            include: {
-              product: {
-                select: {
-                  title: true,
-                  price: true
-                }
-              }
-            }
-          }
+      return {
+        data: orders,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
         },
-        orderBy: { createdAt: 'desc' }
-      }),
-      this.prisma.order.count({ where })
-    ]);
-
-    return {
-      orders,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    };
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get orders: ${error}`, error);
+      throw new BadRequestException('Failed to fetch orders');
+    }
   }
 
   async getOrderById(orderId: string, userId: string) {
@@ -158,10 +187,10 @@ export class OrdersService {
       include: {
         orderItems: {
           include: {
-            product: true
-          }
-        }
-      }
+            product: true,
+          },
+        },
+      },
     });
 
     if (!order) {
@@ -169,16 +198,28 @@ export class OrdersService {
     }
 
     // Cache the result
-    await this.redisService.cacheOrderDetails(orderId, order as unknown as CachedOrder);
+    await this.redisService.cacheOrderDetails(
+      orderId,
+      order as unknown as CachedOrder,
+    );
 
     return order;
   }
 
-  async updateOrderStatus(orderId: string, userId: string, updateOrderDto: UpdateOrderDto) {
+  async updateOrderStatus(
+    orderId: string,
+    userId: string,
+    updateOrderDto: UpdateOrderDto,
+  ) {
     const order = await this.getOrderById(orderId, userId);
 
-    if (order.status === OrderStatus.COMPLETED || order.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException('Cannot update completed or cancelled orders');
+    if (
+      order.status === OrderStatus.COMPLETED ||
+      order.status === OrderStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'Cannot update completed or cancelled orders',
+      );
     }
 
     return this.prisma.order.update({
@@ -187,46 +228,53 @@ export class OrdersService {
       include: {
         orderItems: {
           include: {
-            product: true
-          }
-        }
-      }
+            product: true,
+          },
+        },
+      },
     });
   }
 
-  async cancelOrder(orderId: string, userId: string) {
+  async cancelOrder(orderId: string, userId: string): Promise<CachedOrder> {
     const order = await this.getOrderById(orderId, userId);
 
     if (order.status !== OrderStatus.PENDING) {
       throw new BadRequestException('Only pending orders can be cancelled');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      // Restore product stock
-      await Promise.all(
-        order.orderItems.map(item =>
-          tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: item.quantity },
-              inStock: true
-            }
-          })
-        )
+    try {
+      const cancelledOrder = await this.prisma.$transaction(async (tx) => {
+        await this.updateProductStock(
+          tx,
+          order.orderItems.map((item) => ({
+            productId: item.product.id,
+            quantity: item.quantity,
+          })),
+          true,
+        );
+
+        return tx.order.update({
+          where: { id: orderId },
+          data: { status: OrderStatus.CANCELLED },
+          include: {
+            orderItems: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        });
+      });
+
+      await this.redisService.cacheOrderDetails(
+        orderId,
+        cancelledOrder as unknown as CachedOrder,
       );
 
-      // Update order status
-      return tx.order.update({
-        where: { id: orderId },
-        data: { status: OrderStatus.CANCELLED },
-        include: {
-          orderItems: {
-            include: {
-              product: true
-            }
-          }
-        }
-      });
-    });
+      return cancelledOrder as unknown as CachedOrder;
+    } catch (error) {
+      this.logger.error(`Failed to cancel order: ${error}`, error);
+      throw new BadRequestException('Failed to cancel order');
+    }
   }
 }

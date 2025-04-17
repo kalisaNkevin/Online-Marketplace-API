@@ -40,9 +40,19 @@ export class UsersService {
         email: true,
         name: true,
         role: true,
-        refreshToken: true,
-        resetToken: true,
+        phoneNumber: true,
+        address: true,
+        city: true,
+        country: true,
+        postalCode: true,
+        avatar: true,
+        dateOfBirth: true,
+        gender: true,
+        bio: true,
+        preferredLanguage: true,
+        isEmailVerified: true,
         isActive: true,
+        lastLogin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -66,8 +76,8 @@ export class UsersService {
     return await this.prisma.user.update({
       where: { id: userId },
       data: {
-        refreshToken: refreshToken || null
-      }
+        refreshToken: refreshToken || null,
+      },
     });
   }
 
@@ -75,15 +85,15 @@ export class UsersService {
     return await this.prisma.user.update({
       where: { id: userId },
       data: {
-        resetToken: resetToken || null
-      }
+        resetToken: resetToken || null,
+      },
     });
   }
 
   async updatePassword(userId: string, hashedPassword: string) {
     return await this.prisma.user.update({
       where: { id: userId },
-      data: { password: hashedPassword }
+      data: { password: hashedPassword },
     });
   }
 
@@ -104,7 +114,10 @@ export class UsersService {
   async updateProfile(id: string, updateProfileDto: UpdateProfileDto) {
     if (updateProfileDto.password) {
       const salt = await bcrypt.genSalt();
-      updateProfileDto.password = await bcrypt.hash(updateProfileDto.password, salt);
+      updateProfileDto.password = await bcrypt.hash(
+        updateProfileDto.password,
+        salt,
+      );
     }
 
     return this.prisma.user.update({
@@ -133,6 +146,4 @@ export class UsersService {
       where: { id },
     });
   }
-
-  // Additional methods such as update, delete, etc. can be added here
 }

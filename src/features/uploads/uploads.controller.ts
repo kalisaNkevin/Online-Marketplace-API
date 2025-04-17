@@ -26,13 +26,12 @@ import { UploadsService } from './uploads.service';
 import { UploadResponseDto } from './dto/upload-response.dto';
 import { UploadFileDto, UploadFilesDto } from './dto/upload-file.dto';
 
-
 // Increase to 15MB and add compression
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 
 @ApiTags('Uploads')
 @Controller('uploads')
-@ApiBearerAuth() // Add Swagger authentication documentation
+@ApiBearerAuth('JWT-auth') // Add Swagger authentication documentation
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 

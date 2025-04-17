@@ -10,11 +10,13 @@ import { UploadsModule } from './features/uploads/uploads.module';
 import { PaymentsModule } from './features/payments/payments.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { PrismaModule } from './prisma/prisma.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StoresModule } from './features/stores/stores.module';
 import { CategoryModule } from './features/categories/categories.module';
 import { ReviewsModule } from './features/reviews/reviews.module';
-import { CheckoutModule } from './features/checkout/checkout.module';
+import { MailerModule } from '@nestjs-modules/mailer';
+import { mailConfig } from './config/mail.config';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -27,13 +29,18 @@ import { CheckoutModule } from './features/checkout/checkout.module';
     CategoryModule,
     PaymentsModule,
     PrismaModule,
-    CheckoutModule,
+    EmailModule,
     ReviewsModule,
     CacheModule.register({
       ttl: 60 * 60, // 1 hour
     }),
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    MailerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: mailConfig,
     }),
   ],
   controllers: [AppController, OrdersController],

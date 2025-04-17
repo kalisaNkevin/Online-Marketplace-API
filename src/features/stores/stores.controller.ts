@@ -22,6 +22,7 @@ import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guards';
 import { Role } from '@prisma/client';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @ApiTags('Stores')
 @Controller('stores')
@@ -43,7 +44,6 @@ export class StoresController {
     }
     return await this.storesService.create(req.user.sub, createStoreDto);
   }
-
   @Get()
   @ApiOperation({ summary: 'Get all stores' })
   @ApiResponse({
@@ -51,33 +51,28 @@ export class StoresController {
     description: 'Returns all stores with basic information',
   })
   async findAll() {
-    return await this.storesService.findAll(
-        {
-            page: 1,
-            limit: 10,
-            sortBy: 'createdAt',
-            sortOrder: 'desc',
-        },
-    );
+    return await this.storesService.findAll({
+      page: 1,
+      limit: 10,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    });
   }
 
   @Get('my-store')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get current user\'s store' })
+  @ApiOperation({ summary: "Get current user's store" })
   @ApiResponse({
     status: 200,
     description: 'Returns the stores owned by the current user',
   })
   async findMyStore(@Request() req) {
-    return await this.storesService.findByUser(
-        req.user.sub,
-        {
-            page: 1,
-            limit: 10,
-            sortBy: 'createdAt',
-            sortOrder: 'desc',
-        },
-    );
+    return await this.storesService.findByUser(req.user.sub, {
+      page: 1,
+      limit: 10,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    });
   }
 
   @Get(':id')

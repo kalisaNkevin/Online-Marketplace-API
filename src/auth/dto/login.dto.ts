@@ -3,7 +3,8 @@ import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class LoginUserDto {
   @ApiProperty({
-    example: 'support@marketplace.gov.rw',
+    example:
+      'admin@marketplace.com | seller@marketplace.com | shopper@marketplace.com ',
     description: 'Email address of the user',
   })
   @IsEmail()
@@ -11,7 +12,7 @@ export class LoginUserDto {
   email: string;
 
   @ApiProperty({
-    example: 'password123',
+    example: 'Password@123',
     description: 'User password - minimum 6 characters',
     minLength: 6,
   })

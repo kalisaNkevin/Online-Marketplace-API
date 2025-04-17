@@ -1,91 +1,123 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { QueryCategoryDto } from './dto/query-category.dto';
+import { CategoryEntity } from './entities/category.entity';
+import { handlePrismaError } from '../../common/utils/prisma-error-handler.util';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CategoriesService {
+  private readonly logger = new Logger(CategoriesService.name);
+
+  private readonly defaultCategorySelect = Prisma.validator<Prisma.CategorySelect>()({
+    id: true,
+    name: true,
+    description: true,
+    createdAt: true,
+    updatedAt: true,
+  });
+
+  private readonly defaultInclude = {
+    _count: {
+      select: {
+        products: true,
+      },
+    },
+  };
+
   constructor(private readonly prisma: PrismaService) {}
 
-
-  async create(createCategoryDto: CreateCategoryDto): Promise<CreateCategoryDto> {
+  async create(createCategoryDto: CreateCategoryDto): Promise<CategoryEntity> {
     try {
       const category = await this.prisma.category.create({
-        data: createCategoryDto
+        data: createCategoryDto,
+        include: this.defaultInclude,
       });
 
-      return category  ;
+      this.logger.log(`Category created: ${category.id} - ${category.name}`);
+      return category;
     } catch (error) {
-      this.handlePrismaError(error);
+      this.logger.error(`Failed to create category: ${error}`);
+      handlePrismaError(error);
     }
   }
 
-  async findAll(query: QueryCategoryDto): Promise<CreateCategoryDto[]> {
-    const { search, sortOrder = 'desc' } = query;
-    const where = this.buildSearchQuery(search);
+  async findAll(): Promise<CategoryEntity[]> {
+    try {
+      const categories = await this.prisma.category.findMany({
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
-    const categories = await this.prisma.category.findMany({
-      where,
-      orderBy: {
-        name: sortOrder
-      }
-    });
-
-    return categories ;
+      return categories
+    } catch (error) {
+      this.logger.error(`Failed to fetch categories: ${error}`);
+      throw error;
+    }
   }
 
-  async findOne(id: string): Promise<QueryCategoryDto> {
-    const category = await this.prisma.category.findUnique({
-      where: { id }
-    });
+  async findOne(id: string): Promise<CategoryEntity> {
+    try {
+      const category = await this.prisma.category.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
-    if (!category) {
+      if (!category) {
+        throw new NotFoundException(`Category with ID ${id} not found`);
+      }
+
+      return category;
+    } catch (error) {
+      this.logger.error(`Failed to fetch category ${id}: ${error}`);
       throw new NotFoundException(`Category with ID ${id} not found`);
     }
-
-    return ;
   }
 
-  async update(id: string, updateCategoryDto: UpdateCategoryDto): Promise<QueryCategoryDto> {
-    await this.findOne(id);
+  async update(
+    id: string,
+    updateCategoryDto: UpdateCategoryDto,
+  ): Promise<CategoryEntity> {
+    await this.findOne(id); // Verify existence
 
     try {
-      const updated = await this.prisma.category.update({
+      const category = await this.prisma.category.update({
         where: { id },
-        data: updateCategoryDto
+        data: updateCategoryDto,
+        include: this.defaultInclude,
       });
 
-      return ;
+      this.logger.log(`Category updated: ${id} - ${category.name}`);
+      return category;
     } catch (error) {
-      this.handlePrismaError(error);
+      this.logger.error(`Failed to update category ${id}: ${error}`);
+      handlePrismaError(error);
     }
   }
 
-  async remove(id: string): Promise<{ message: string }> {
-    await this.findOne(id);
-    await this.prisma.category.delete({ where: { id } });
-    return { message: 'Category deleted successfully' };
-  }
+  async remove(id: string): Promise<void> {
+    await this.findOne(id); // Verify existence
 
-  private buildSearchQuery(search?: string): Prisma.CategoryWhereInput {
-    return {
-      AND: [
-        search ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
-          ],
-        } : {},
-      ],
-    };
-  }
-
-  private handlePrismaError(error: any): never {
-    if (error.code === 'P2002') {
-      throw new ConflictException('Category name already exists');
+    try {
+      await this.prisma.category.delete({
+        where: { id },
+      });
+      this.logger.log(`Category deleted: ${id}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete category ${id}: ${error}`);
+      handlePrismaError(error);
     }
-    throw error;
   }
 }
