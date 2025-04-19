@@ -20,6 +20,7 @@ enum OrderStatus {
   PENDING
   PROCESSING
   SHIPPED
+  DELIVERED
   COMPLETED
   CANCELLED
 }
@@ -53,6 +54,13 @@ enum ProductSize {
   SIZE_45
   // One size
   ONE_SIZE
+}
+
+enum PaymentMethod {
+  MOMO_MTN // MTN Mobile Money
+  MOMO_AIRTEL // Airtel Money
+  CARD // Card payments
+  CASH // Cash on delivery
 }
 
 model User {
@@ -124,6 +132,9 @@ model Product {
   images        String[] // Additional product images
   averageRating Decimal? @default(0)
   isFeatured    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  featuredAt    DateTime?
+  lastModifiedBy String?  // Admin who last modified the product
 
   // Sizes relation
   variants ProductVariant[]
@@ -161,38 +172,43 @@ model Review {
   id        String   @id @default(uuid())
   rating    Int
   comment   String?
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
 
-  // Relations
-  user      User    @relation(fields: [userId], references: [id])
-  userId    String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId String
-  order     Order   @relation(fields: [orderId], references: [id])
-  orderId   String
-
-  @@unique([userId, productId, orderId])
-  @@index([userId])
+  @@unique([productId, orderId, userId])
   @@index([productId])
   @@index([orderId])
+  @@index([userId])
 }
 
 model Order {
-  id               String         @id @default(uuid())
+  id               String        @id @default(uuid())
   userId           String
-  user             User           @relation(fields: [userId], references: [id])
-  status           OrderStatus    @default(PENDING)
-  total            Decimal?       @db.Decimal(10, 2)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  paymentStatus    PaymentStatus?
+  status           OrderStatus   @default(PENDING)
+  statusMessage    String?       // Added for error messages
+  total            Decimal       @db.Decimal(10, 2)
+  paymentMethod    PaymentMethod
+  paymentStatus    PaymentStatus @default(PENDING)
   paymentReference String?
-  paymentProvider  String?
+  shippingAddress  Json
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  completedAt      DateTime?
+  cancelledAt      DateTime?
 
   // Relations
-  orderItems OrderItem[]
-  reviews    Review[]
+  user          User                 @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  reviews       Review[]
+  statusHistory OrderStatusHistory[]
+
+  @@index([userId])
 }
 
 model Upload {
@@ -207,13 +223,20 @@ model Upload {
 }
 
 model OrderItem {
-  id              String  @id @default(uuid())
-  order           Order   @relation(fields: [orderId], references: [id])
+  id              String   @id @default(uuid())
   orderId         String
-  product         Product @relation(fields: [productId], references: [id])
   productId       String
   quantity        Int
-  priceAtPurchase Decimal @db.Decimal(10, 2)
+  price           Decimal  @db.Decimal(10, 2)
+  priceAtPurchase Decimal  @db.Decimal(10, 2)  // Added this field
+  total           Decimal  @db.Decimal(10, 2)
+  size            String?
+
+  order           Order    @relation(fields: [orderId], references: [id])
+  product         Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model Cart {
@@ -266,4 +289,17 @@ model Tag {
   products  Product[] // Many-to-many relation with Product
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now())
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String
+  status    OrderStatus
+  comment   String
+  createdAt DateTime    @default(now())
+
+  // Relation
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
 }

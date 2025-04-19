@@ -26,13 +26,13 @@ import { Public } from 'src/auth/decorators/public.decorator';
 
 @ApiTags('Stores')
 @Controller('stores')
-@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard)
 export class StoresController {
   constructor(private readonly storesService: StoresService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Create a new store' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Create a new store (Sellers only)' })
   @ApiResponse({
     status: 201,
     description: 'Store has been successfully created',
@@ -44,8 +44,10 @@ export class StoresController {
     }
     return await this.storesService.create(req.user.sub, createStoreDto);
   }
+
   @Get()
-  @ApiOperation({ summary: 'Get all stores' })
+  @Public()
+  @ApiOperation({ summary: 'Get all stores (Public)' })
   @ApiResponse({
     status: 200,
     description: 'Returns all stores with basic information',
@@ -60,8 +62,8 @@ export class StoresController {
   }
 
   @Get('my-store')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Get current user's store" })
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: "Get current user's store (Private)" })
   @ApiResponse({
     status: 200,
     description: 'Returns the stores owned by the current user',
@@ -76,7 +78,8 @@ export class StoresController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get store by ID' })
+  @Public()
+  @ApiOperation({ summary: 'Get store by ID (Public)' })
   @ApiParam({ name: 'id', description: 'Store ID' })
   @ApiResponse({
     status: 200,
@@ -88,8 +91,8 @@ export class StoresController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Update store' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update store (Private)' })
   @ApiParam({ name: 'id', description: 'Store ID' })
   @ApiResponse({
     status: 200,
@@ -106,8 +109,8 @@ export class StoresController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Delete store' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete store (Private)' })
   @ApiParam({ name: 'id', description: 'Store ID' })
   @ApiResponse({
     status: 200,

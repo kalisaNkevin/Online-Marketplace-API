@@ -1,102 +1,132 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../database/prisma.service';
+import { RedisService } from '../../redis/redis.service';
+import { ProductResponseDto } from './dto/product-response.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { Prisma, Product, ProductSize } from '@prisma/client';
-import { PrismaClientValidationError } from '@prisma/client/runtime/library';
-import {
-  ProductResponseDto,
-  PaginatedProductsResponse,
-} from './dto/product-response.dto';
 import { QueryProductDto } from './dto/query-product.dto';
+import { Prisma } from '@prisma/client';
+import { ProductEntity } from './entities/product.entity';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
+
+  private readonly productInclude = {
+    store: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
+    categories: true,
+    variants: true,
+    Review: {
+      // Changed from 'reviews' to 'Review'
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    },
+  } as const;
+
+  private transformProductResponse(product: any): ProductResponseDto {
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const averageRating = product.reviews?.length
+      ? Number(
+          (
+            product.reviews.reduce((acc, r) => acc + r.rating, 0) /
+            product.reviews.length
+          ).toFixed(1),
+        )
+      : null;
+
+    return {
+      id: product.id,
+      name: product.name,
+      description: product.description || '',
+      price: product.price.toString(), // Convert Decimal to string
+      quantity: product.quantity,
+      discount: product.discount || null, // Keep as Decimal
+      thumbnail: product.thumbnail || null,
+      images: product.images || [],
+      isFeatured: product.isFeatured || false,
+      isActive: product.isActive || false,
+      storeId: product.storeId,
+      store: product.store
+        ? {
+            id: product.store.id,
+            name: product.store.name,
+          }
+        : null,
+      categories:
+        product.categories?.map((cat) => ({
+          id: cat.id,
+          name: cat.name,
+        })) || [],
+      variants:
+        product.variants?.map((variant) => ({
+          size: variant.size,
+          quantity: variant.quantity,
+        })) || [],
+      reviews:
+        product.reviews?.map((review) => ({
+          id: review.id,
+          rating: review.rating,
+          comment: review.comment,
+          user: {
+            id: review.user.id,
+            name: review.user.name,
+          },
+        })) || [],
+      averageRating,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    };
+  }
 
   async create(
+    sellerId: string,
     createProductDto: CreateProductDto,
-    storeId: string,
   ): Promise<ProductResponseDto> {
-    try {
-      // Verify store and categories exist
-      const [store, categories] = await Promise.all([
-        this.prisma.store.findUnique({ where: { id: storeId } }),
-        this.prisma.category.findMany({
-          where: { id: { in: createProductDto.categoryIds } },
-        }),
-      ]);
+    const { categories, variants, ...data } = createProductDto;
 
-      if (!store) {
-        throw new NotFoundException(`Store with ID ${storeId} not found`);
-      }
-
-      if (categories.length !== createProductDto.categoryIds.length) {
-        throw new NotFoundException('One or more categories not found');
-      }
-
-      const product = await this.prisma.product.create({
-        data: {
-          name: createProductDto.name,
-          description: createProductDto.description,
-          price: new Prisma.Decimal(createProductDto.price.toString()),
-          quantity: createProductDto.quantity,
-          isFeatured: createProductDto.isFeatured ?? false,
-          store: { connect: { id: storeId } },
-          categories: {
-            connect: createProductDto.categoryIds.map((id) => ({ id })),
-          },
-          variants: {
-            create: createProductDto.variants.map((variant) => ({
-              size: variant,
-              quantity: 0,
-            })),
-          },
-          averageRating: new Prisma.Decimal(0),
+    const product = await this.prisma.product.create({
+      data: {
+        ...data,
+        store: { connect: { id: sellerId } },
+        categories: {
+          connect: categories?.map((id) => ({ id })),
         },
-        include: {
-          store: {
-            select: { id: true, name: true },
-          },
-          categories: {
-            select: { id: true, name: true },
-          },
-          variants: {
-            select: {
-              size: true,
-            },
-          },
-          _count: {
-            select: {
-              Review: true,
-              OrderItem: true,
-              categories: true,
-            },
+        variants: {
+          createMany: {
+            data: variants || [],
           },
         },
-      });
+      },
+      include: {
+        store: true,
+        categories: true,
+        variants: true,
+      },
+    });
 
-      return {
-        ...product,
-        categoryIds: product.categories.map((c) => c.id),
-        metrics: {
-          totalReviews: product._count.Review,
-          totalOrders: product._count.OrderItem,
-          averageRating: product.averageRating,
-        },
-        variants: product.variants.map((variant) => variant.size),
-      };
-    } catch (error) {
-      if (error instanceof PrismaClientValidationError) {
-        throw new BadRequestException('Invalid product data: ' + error.message);
-      }
-      throw error;
-    }
+    await this.redisService.del('featured_products');
+    return this.transformProductResponse(product);
   }
 
   async findAll(query: QueryProductDto): Promise<{
@@ -107,41 +137,36 @@ export class ProductsService {
       limit: number;
       totalPages: number;
     };
+    filters: {
+      appliedCategory: string | null;
+      priceRange: { min: number | null; max: number | null };
+      ratingFilter: number | null;
+    };
   }> {
     const {
       page = 1,
       limit = 10,
       search,
-      categoryId,
+      categoryId: category,
       minPrice,
       maxPrice,
       sortOrder = 'desc',
     } = query;
 
     const where: Prisma.ProductWhereInput = {
-      AND: [
-        search
-          ? {
-              OR: [
-                { name: { contains: search, mode: 'insensitive' } },
-                { description: { contains: search, mode: 'insensitive' } },
-              ],
-            }
-          : {},
-        categoryId
-          ? {
-              categories: {
-                some: { id: categoryId },
-              },
-            }
-          : {},
-        minPrice ? { price: { gte: new Prisma.Decimal(minPrice) } } : {},
-        maxPrice ? { price: { lte: new Prisma.Decimal(maxPrice) } } : {},
-      
-      ],
+      isActive: true,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+      ...(category && {
+        categories: { some: { id: category } },
+      }),
+      ...(minPrice && { price: { gte: new Prisma.Decimal(minPrice) } }),
+      ...(maxPrice && { price: { lte: new Prisma.Decimal(maxPrice) } }),
     };
-
-
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
@@ -149,55 +174,66 @@ export class ProductsService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          store: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          categories: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
+          store: true,
+          categories: true,
           variants: true,
         },
+        orderBy: { [sortOrder]: 'desc' },
       }),
       this.prisma.product.count({ where }),
     ]);
 
     return {
-      data: products.map((product) => ({
-        ...product,
-        variants: product.variants.map((variant) => variant.size),
-        categoryIds: product.categories.map((c) => c.id),
-      })),
+      data: products.map(this.transformProductResponse),
       pagination: {
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
       },
+      filters: {
+        appliedCategory: category || null,
+        priceRange: {
+          min: minPrice || null,
+          max: maxPrice || null,
+        },
+        ratingFilter: null,
+      },
     };
   }
 
-  async findOne(id: string) {
+  async findFeatured(): Promise<ProductResponseDto[]> {
+    const cachedProducts = await this.redisService.get('featured_products');
+    if (cachedProducts) {
+      return JSON.parse(cachedProducts);
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: { isFeatured: true, isActive: true },
+      include: {
+        store: true,
+        categories: true,
+        variants: true,
+      },
+      take: 10,
+    });
+
+    const transformed = products.map(this.transformProductResponse);
+    await this.redisService.set(
+      'featured_products',
+      JSON.stringify(transformed),
+      3600,
+    );
+
+    return transformed;
+  }
+
+  async findOne(id: string): Promise<ProductResponseDto> {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
-        store: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        categories: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        store: true,
+        categories: true,
         variants: true,
       },
     });
@@ -206,41 +242,108 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    return {
-      ...product,
-      categoryIds: product.categories.map((c) => c.id),
-    };
+    return this.transformProductResponse(product);
   }
 
   async update(
     id: string,
+    sellerId: string,
     updateProductDto: UpdateProductDto,
-    storeId: string,
   ): Promise<ProductResponseDto> {
-    const product = await this.findOne(id);
+    const product = await this.prisma.product.findFirst({
+      where: { id, store: { ownerId: sellerId } },
+    });
 
-    if (product.storeId !== storeId) {
-      throw new ForbiddenException(
-        'You can only update products from your store',
-      );
+    if (!product) {
+      throw new NotFoundException('Product not found or unauthorized');
     }
 
-    const updatedProduct = await this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: {
         ...updateProductDto,
-        price: updateProductDto.price
-          ? new Prisma.Decimal(updateProductDto.price.toString())
+        categories: updateProductDto.categories
+          ? {
+              set: updateProductDto.categories.map((id) => ({ id })),
+            }
           : undefined,
         variants: updateProductDto.variants
           ? {
-              deleteMany: {},
-              create: updateProductDto.variants.map((variant) => ({
-                size: variant,
-                quantity: 0,
+              upsert: updateProductDto.variants.map((variant) => ({
+                where: {
+                  productId_size: { productId: id, size: variant.size },
+                },
+                update: {
+                  size: variant.size,
+                  quantity: variant.quantity,
+                },
+                create: {
+                  size: variant.size,
+                  quantity: variant.quantity,
+                },
               })),
             }
           : undefined,
+      },
+      include: {
+        store: true,
+        categories: true,
+        variants: true,
+      },
+    });
+
+    if (updated.isFeatured) {
+      await this.redisService.del('featured_products');
+    }
+
+    return this.transformProductResponse(updated);
+  }
+
+  async remove(id: string, storeId: string): Promise<{ message: string }> {
+    // Check if product exists and belongs to the store
+    const product = await this.prisma.product.findFirst({
+      where: {
+        id,
+        storeId,
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException(
+        'Product not found or you are not authorized to delete it',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Delete related records first
+      await tx.productVariant.deleteMany({
+        where: { productId: id },
+      });
+
+      // Delete the product
+      await tx.product.delete({
+        where: { id },
+      });
+    });
+
+    // Clear cache if it was a featured product
+    if (product.isFeatured) {
+      await this.redisService.del('featured_products');
+    }
+
+    return { message: 'Product deleted successfully' };
+  }
+
+  async getFeaturedProducts(): Promise<ProductResponseDto[]> {
+    const cachedProducts = await this.redisService.get('featured_products');
+    if (cachedProducts) {
+      return JSON.parse(cachedProducts);
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        isFeatured: true,
+        isActive: true,
       },
       include: {
         store: {
@@ -249,51 +352,87 @@ export class ProductsService {
             name: true,
           },
         },
-        categories: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        categories: true,
         variants: true,
-        _count: {
-          select: {
-            Review: true,
-            OrderItem: true,
+        Review: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 12,
     });
 
-    return {
-      ...updatedProduct,
-      store: updatedProduct.store,
-      categories: updatedProduct.categories,
-      categoryIds: updatedProduct.categories.map((category) => category.id),
-      variants: updatedProduct.variants.map((variant) => variant.size),
-      metrics: {
-        totalReviews: updatedProduct._count.Review,
-        totalOrders: updatedProduct._count.OrderItem,
-        averageRating: updatedProduct.averageRating,
-      },
-    };
+    const transformedProducts = products.map(this.transformProductResponse);
+
+    await this.redisService.set(
+      'featured_products',
+      JSON.stringify(transformedProducts),
+      3600,
+    );
+
+    return transformedProducts;
   }
 
-  async remove(id: string, storeId: string) {
-    const product = await this.findOne(id);
-
-    if (product.storeId !== storeId) {
-      throw new ForbiddenException(
-        'You can only delete products from your store',
-      );
-    }
-
-    await this.prisma.product.delete({
+  async toggleFeaturedStatus(
+    id: string,
+    adminId: string,
+    isFeatured: boolean,
+  ): Promise<ProductEntity> {
+    // Verify product exists
+    const product = await this.prisma.product.findUnique({
       where: { id },
+      include: {
+        store: true,
+        categories: true,
+        variants: true,
+        Review: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    return {
-      message: 'Product deleted successfully',
-    };
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+
+    // Update featured status
+    const updatedProduct = await this.prisma.product.update({
+      where: { id },
+      data: { isFeatured },
+      include: {
+        store: true,
+        categories: true,
+        variants: true,
+        Review: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    await this.redisService.del('featured_products');
+    return this.transformProductResponse(updatedProduct);
   }
 }

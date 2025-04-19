@@ -12,6 +12,7 @@ import {
   ParseUUIDPipe,
   HttpStatus,
   HttpCode,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,7 +26,6 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guards';
-import { SellerGuard } from '../../auth/guards/seller.guard';
 
 import { Role } from '@prisma/client';
 import { QueryProductDto } from './dto/query-product.dto';
@@ -37,17 +37,20 @@ import {
   ProductResponseDto,
 } from './dto/product-response.dto';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { AdminUpdateProductDto } from './dto/admin-update-product.dto';
+import { ProductEntity } from './entities/product.entity';
+import { GetUser } from 'src/auth/decorators/get-user.decorator';
 
 @ApiTags('Products')
 @Controller('products')
-@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles([Role.SELLER])
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new product (Sellers only)' })
   @ApiResponse({
@@ -64,14 +67,19 @@ export class ProductsController {
     @Request() req,
     @Body() createProductDto: CreateProductDto,
   ): Promise<ProductResponseDto> {
-    return this.productsService.create(createProductDto, req.user.storeId);
+    // Verify storeId exists in request
+    if (!req.user?.storeId) {
+      throw new ForbiddenException('Seller must have an associated store');
+    }
+    return this.productsService.create(req.user.storeId, createProductDto);
   }
 
+  // Public endpoint - anyone can access
   @Get()
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Get all products with filtering and pagination.',
+    summary: 'Get all products (Public)',
     description: 'Search, filter and paginate through products',
   })
   @ApiResponse({
@@ -91,6 +99,19 @@ export class ProductsController {
     return this.productsService.findAll(query);
   }
 
+  @Get('featured')
+  @Public()
+  @ApiOperation({ summary: 'Get featured products' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns featured products',
+    type: [ProductEntity],
+  })
+  async getFeaturedProducts(): Promise<ProductEntity[]> {
+    return this.productsService.getFeaturedProducts();
+  }
+
+  // Public endpoint - anyone can access
   @Get(':id')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -116,16 +137,17 @@ export class ProductsController {
     const product = await this.productsService.findOne(id);
     return {
       ...product,
-      variants: product.variants.map((variant) => variant.size),
+      variants: product.variants.map((variant) => variant),
     };
   }
 
+  // Protected endpoint - only for sellers
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles([Role.SELLER])
-  @ApiBearerAuth()
+  @UseGuards(RolesGuard)
+  @Roles([Role.SELLER, Role.ADMIN])
+  @ApiBearerAuth('JWT-auth') // Move to protected route
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update product (Sellers only)' })
+  @ApiOperation({ summary: 'Update product Sellers | Admin' })
   @ApiParam({
     name: 'id',
     description: 'Product UUID',
@@ -150,13 +172,16 @@ export class ProductsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateProductDto: UpdateProductDto,
   ): Promise<ProductResponseDto> {
-    return this.productsService.update(id, updateProductDto, req.user.storeId);
+    return this.productsService.update(id, req.user.storeId, updateProductDto);
   }
 
+  // Protected endpoint - only for sellers
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, SellerGuard)
+  @UseGuards(RolesGuard)
+  @Roles([Role.SELLER, Role.ADMIN])
+  @ApiBearerAuth('JWT-auth') // Move to protected route
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete product (Sellers only)' })
+  @ApiOperation({ summary: 'Delete product Sellers | Admin' })
   @ApiParam({
     name: 'id',
     description: 'Product UUID',
@@ -180,5 +205,19 @@ export class ProductsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string }> {
     return this.productsService.remove(id, req.user.storeId);
+  }
+
+
+  @Patch(':id/mark-featured')
+  @Roles([Role.ADMIN])
+  @UseGuards(RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Admin Mark product featured' })
+  async toggleFeaturedStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('id') adminId: string,
+    @Body('isFeatured') isFeatured: boolean,
+  ): Promise<ProductEntity> {
+    return this.productsService.toggleFeaturedStatus(id, adminId, isFeatured);
   }
 }

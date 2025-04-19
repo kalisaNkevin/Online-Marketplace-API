@@ -6,7 +6,7 @@ export class PaginatedOrdersResponse {
   data: OrderEntity[];
 
   @ApiProperty()
-  meta: {
+  pagination: {
     total: number;
     page: number;
     limit: number;

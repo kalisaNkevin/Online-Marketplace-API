@@ -26,21 +26,20 @@ import { UpdateReviewDto } from './dto/update-review.dto';
 
 import { ReviewEntity } from './entities/review.entity';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @ApiTags('Reviews')
-@Controller('products/:productId/reviews')
-@ApiResponse({
-  status: HttpStatus.UNAUTHORIZED,
-  description: 'Unauthorized - JWT token missing or invalid',
-})
+@Controller('reviews/products/:productId')
+@UseGuards(JwtAuthGuard)
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new review for a product' })
+  @ApiOperation({
+    summary: 'Create a new review for a product (Authenticated)',
+  })
   @ApiParam({
     name: 'productId',
     description: 'UUID of the product',
@@ -53,6 +52,10 @@ export class ReviewsController {
     status: HttpStatus.CREATED,
     description: 'Review created successfully',
     type: ReviewEntity,
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized - JWT token missing or invalid',
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -71,8 +74,9 @@ export class ReviewsController {
   }
 
   @Get()
+  @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get all reviews for a product' })
+  @ApiOperation({ summary: 'Get all reviews for a product (Public)' })
   @ApiParam({
     name: 'productId',
     description: 'UUID of the product',
@@ -92,10 +96,9 @@ export class ReviewsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update an existing review' })
+  @ApiOperation({ summary: 'Update an existing review (Authenticated)' })
   @ApiParam({
     name: 'productId',
     description: 'UUID of the product',
@@ -133,10 +136,9 @@ export class ReviewsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a review' })
+  @ApiOperation({ summary: 'Delete a review (Authenticated)' })
   @ApiParam({
     name: 'productId',
     description: 'UUID of the product',

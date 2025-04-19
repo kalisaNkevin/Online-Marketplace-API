@@ -5,6 +5,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Inject } from '@nestjs/common';
 import { CachedOrder } from 'src/features/orders/interfaces/order.interface';
+import { OrderEntity } from '../features/orders/entities/order.entity';
 
 @Injectable()
 export class RedisService {
@@ -13,22 +14,56 @@ export class RedisService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  async addOrderToQueue(data: any) {
-    return await this.orderQueue.add('process-order', data, {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 1000,
+  async set(key: string, value: string, ttl: number): Promise<void> {
+    await this.cacheManager.set(key, value, ttl * 1000); // Convert to milliseconds
+  }
+
+  async get(key: string): Promise<string | null> {
+    return await this.cacheManager.get<string>(key);
+  }
+
+  async del(key: string): Promise<void> {
+    await this.cacheManager.del(key);
+  }
+
+  async addOrderToQueue(
+    order: OrderEntity,
+    userId: string,
+    operation: 'process-order' | 'process-payment',
+  ) {
+    return await this.orderQueue.add(
+      operation,
+      { order, userId },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+        removeOnComplete: true,
+        removeOnFail: false,
       },
-    });
+    );
   }
 
-  async cacheOrderDetails(orderId: string, data: CachedOrder): Promise<void> {
-    await this.cacheManager.set(`order:${orderId}`, data, 3600000); // 1 hour
+  async invalidateOrderCache(orderId: string): Promise<void> {
+    await this.del(`order:${orderId}`);
   }
 
-  async getCachedOrderDetails(orderId: string): Promise<CachedOrder | null> {
-    const cached = await this.cacheManager.get<CachedOrder>(`order:${orderId}`);
-    return cached || null;
+  async cacheOrder(order: OrderEntity): Promise<void> {
+    await this.set(`order:${order.id}`, JSON.stringify(order), 3600); // 1 hour
+  }
+
+  async getCachedOrder(orderId: string): Promise<OrderEntity | null> {
+    const cached = await this.get(`order:${orderId}`);
+    return cached ? JSON.parse(cached) : null;
+  }
+
+  async invalidateUserOrders(userId: string): Promise<void> {
+    await this.del(`user:${userId}:orders`);
+  }
+
+  async invalidateStoreOrders(storeId: string): Promise<void> {
+    await this.del(`store:${storeId}:orders`);
   }
 }

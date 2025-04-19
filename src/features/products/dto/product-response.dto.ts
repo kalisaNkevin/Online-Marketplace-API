@@ -3,30 +3,19 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { ProductSize } from '@prisma/client';
 
 export class StoreDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'store-123' })
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Fashion Store' })
   name: string;
 }
 
 export class CategoryDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'category-123' })
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Clothing' })
   name: string;
-}
-
-export class ProductMetricsDto {
-  @ApiProperty()
-  totalReviews: number;
-
-  @ApiProperty()
-  totalOrders: number;
-
-  @ApiProperty()
-  averageRating: Decimal;
 }
 
 export class ProductResponseDto {
@@ -36,39 +25,84 @@ export class ProductResponseDto {
   @ApiProperty()
   name: string;
 
-  @ApiProperty({ required: false })
-  description?: string;
+  @ApiProperty()
+  description: string;
 
   @ApiProperty()
   price: Decimal;
 
-  @ApiProperty({ required: false })
-  quantity?: number;
+  @ApiProperty()
+  quantity: number;
 
-  @ApiProperty({ required: false })
-  isFeatured?: boolean;
+  @ApiProperty({ required: false, nullable: true })
+  discount: Decimal | null;
 
-  @ApiProperty({ required: false })
-  store?: StoreDto;
+  @ApiProperty({ required: false, nullable: true })
+  thumbnail: string | null;
 
-  @ApiProperty({ type: [CategoryDto], required: false })
-  categories?: CategoryDto[];
-
-  @ApiProperty({ type: [String], required: false })
-  categoryIds?: string[];
-
-  @ApiProperty({ enum: ProductSize, isArray: true, required: false })
-  variants?: ProductSize[];
+  @ApiProperty({ type: [String] })
+  images: string[];
 
   @ApiProperty()
-  metrics?: ProductMetricsDto;
+  isFeatured: boolean;
+
+  @ApiProperty()
+  isActive: boolean;
+
+  @ApiProperty()
+  storeId: string;
+
+  @ApiProperty()
+  store: {
+    id: string;
+    name: string;
+  } | null;
+
+  @ApiProperty({ type: [Object] })
+  categories: Array<{
+    id: string;
+    name: string;
+  }>;
+
+  @ApiProperty({ type: [Object] })
+  variants: Array<{
+    size: string;
+    quantity: number;
+  }>;
+
+  @ApiProperty({ type: [Object] })
+  reviews: Array<{
+    id: string;
+    rating: number;
+    comment: string;
+    user: {
+      id: string;
+      name: string;
+    };
+  }>;
+
+  @ApiProperty({ required: false, nullable: true })
+  averageRating: number | null;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
 }
 
 export class PaginatedProductsResponse {
   @ApiProperty({ type: [ProductResponseDto] })
   data: ProductResponseDto[];
 
-  @ApiProperty()
+  @ApiProperty({
+    example: {
+      total: 100,
+      page: 1,
+      limit: 10,
+      totalPages: 10,
+    },
+  })
   pagination: {
     total: number;
     page: number;

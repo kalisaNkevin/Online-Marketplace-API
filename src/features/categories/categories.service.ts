@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../database/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoryEntity } from './entities/category.entity';
@@ -10,13 +10,14 @@ import { Prisma } from '@prisma/client';
 export class CategoriesService {
   private readonly logger = new Logger(CategoriesService.name);
 
-  private readonly defaultCategorySelect = Prisma.validator<Prisma.CategorySelect>()({
-    id: true,
-    name: true,
-    description: true,
-    createdAt: true,
-    updatedAt: true,
-  });
+  private readonly defaultCategorySelect =
+    Prisma.validator<Prisma.CategorySelect>()({
+      id: true,
+      name: true,
+      description: true,
+      createdAt: true,
+      updatedAt: true,
+    });
 
   private readonly defaultInclude = {
     _count: {
@@ -55,7 +56,7 @@ export class CategoriesService {
         },
       });
 
-      return categories
+      return categories;
     } catch (error) {
       this.logger.error(`Failed to fetch categories: ${error}`);
       throw error;

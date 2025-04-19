@@ -3,7 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../database/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { OrderStatus, Review, Prisma } from '@prisma/client';
@@ -32,7 +32,11 @@ export class ReviewsService {
         id: orderId,
         userId,
         status: OrderStatus.COMPLETED,
-        orderItems: { some: { productId } },
+        items: {
+          some: {
+            productId,
+          },
+        },
       },
     });
 
@@ -42,13 +46,9 @@ export class ReviewsService {
       );
     }
 
-    const existingReview = await this.prisma.review.findUnique({
+    const existingReview = await this.prisma.review.findFirst({
       where: {
-        userId_productId_orderId: {
-          userId,
-          productId,
-          orderId,
-        },
+        AND: [{ userId }, { productId }, { orderId }],
       },
     });
 

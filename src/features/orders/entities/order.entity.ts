@@ -1,5 +1,51 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
+
+export class OrderItemEntity {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  productId: string;
+
+  @ApiProperty()
+  productName: string;
+
+  @ApiProperty()
+  quantity: number;
+
+  @ApiProperty()
+  price: string;
+
+  @ApiProperty()
+  priceAtPurchase: string;
+
+  @ApiProperty()
+  total: string;
+
+  @ApiProperty({ required: false })
+  size?: string;
+
+  @ApiProperty({ required: false, type: Object, nullable: true })
+  store?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export class OrderUserEntity {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty()
+  phoneNumber: string;
+}
 
 export class OrderEntity {
   @ApiProperty()
@@ -8,33 +54,45 @@ export class OrderEntity {
   @ApiProperty()
   userId: string;
 
-  @ApiProperty()
-  total: number;
-
   @ApiProperty({ enum: OrderStatus })
   status: OrderStatus;
 
-  @ApiProperty({ type: () => [OrderItemEntity] })
-  orderItems: OrderItemEntity[];
+  @ApiProperty({ enum: PaymentStatus })
+  paymentStatus: PaymentStatus;
+
+  @ApiProperty({ enum: PaymentMethod })
+  paymentMethod: PaymentMethod;
+
+  @ApiProperty()
+  paymentReference: string;
+
+  @ApiProperty()
+  total: string;
+
+  @ApiProperty({ type: [OrderItemEntity] })
+  items: OrderItemEntity[];
+
+  @ApiProperty({ 
+    type: 'object', 
+    additionalProperties: true 
+  })
+  shippingAddress: Record<string, any>;
 
   @ApiProperty()
   createdAt: Date;
 
   @ApiProperty()
   updatedAt: Date;
-}
 
-export class OrderItemEntity {
-  @ApiProperty()
-  id: string;
+  @ApiProperty({ required: false, nullable: true })
+  completedAt?: Date | null;
 
-  @ApiProperty()
-  quantity: number;
+  @ApiProperty({ required: false, nullable: true })
+  cancelledAt?: Date | null;
 
-  @ApiProperty()
-  product: {
-    id: string;
-    name: string;
-    price: number;
-  };
+  @ApiProperty({ type: () => OrderUserEntity, nullable: true })
+  user: OrderUserEntity | null;
+
+  @ApiProperty({ type: [Object] })
+  reviews: any[];
 }

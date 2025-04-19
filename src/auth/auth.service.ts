@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   InternalServerErrorException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
@@ -11,7 +12,7 @@ import * as crypto from 'crypto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { EmailService } from 'src/email/email.service';
 import { LoginUserDto } from './dto/login.dto';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../database/prisma.service';
 import { DuplicateEmailException } from '../common/exceptions/duplicate-email.exception';
 import { ConfigService } from '@nestjs/config';
 
@@ -82,10 +83,7 @@ export class AuthService {
   }
 
   async login(loginUserDto: LoginUserDto) {
-    const user = await this.validateUser(
-      loginUserDto.email,
-      loginUserDto.password,
-    );
+    const user = await this.validateUser(loginUserDto.email, loginUserDto.password);
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -95,13 +93,59 @@ export class AuthService {
       throw new UnauthorizedException('Please verify your email first');
     }
 
+    // For sellers, check if they have an associated store
+    if (user.role === 'SELLER') {
+      const store = await this.prisma.store.findFirst({
+        where: { ownerId: user.id }
+      });
+      
+      if (!store) {
+        throw new ForbiddenException('Seller must create a store before creating products');
+      }
+
+      // Include store information in the payload
+      const payload = { 
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        storeId: store.id // Add store ID to payload
+      };
+
+      const [accessToken, refreshToken] = await Promise.all([
+        this.jwtService.signAsync(
+          payload,
+          {
+            secret: this.configService.get('JWT_SECRET'),
+            expiresIn: '1h',
+          },
+        ),
+        this.jwtService.signAsync(
+          { sub: user.id, storeId: store.id }, // Include storeId in refresh token
+          {
+            secret: this.configService.get('JWT_REFRESH_SECRET'),
+            expiresIn: '7d',
+          },
+        ),
+      ]);
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { refreshToken },
+      });
+
+      return { token: accessToken, refreshToken };
+    }
+
+    // For non-sellers, continue with regular payload
+    const payload = { 
+      sub: user.id,
+      email: user.email,
+      role: user.role
+    };
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
-        {
-          sub: user.id,
-          email: user.email,
-          role: user.role, // Include role in token
-        },
+        payload,
         {
           secret: this.configService.get('JWT_SECRET'),
           expiresIn: '1h', // Explicit expiration
@@ -220,7 +264,17 @@ export class AuthService {
   }
 
   private async validateUser(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        stores: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
 
     if (user && (await bcrypt.compare(password, user.password))) {
       const { password, ...result } = user;

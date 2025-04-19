@@ -1,12 +1,17 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bull';
-import { OrderProcessor } from './processors/order.processor';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { RedisService } from './redis.service';
+import { BullModule } from '@nestjs/bull';
 import { CacheModule } from '@nestjs/cache-manager';
+import { RedisService } from './redis.service';
+import { OrderProcessor } from './processors/order.processor';
+import { EmailModule } from '../email/email.module';
+import { PrismaModule } from '../database/prisma.module';
 
 @Module({
   imports: [
+    ConfigModule,
+    PrismaModule,
+    EmailModule,
     CacheModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

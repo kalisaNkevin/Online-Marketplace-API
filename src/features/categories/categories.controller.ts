@@ -31,13 +31,13 @@ import { Role } from '@prisma/client';
 @ApiTags('Categories')
 @Controller('categories')
 @UseGuards(JwtAuthGuard)
-@ApiBearerAuth('JWT-auth')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
   @UseGuards(AdminGuard)
   @Roles([Role.ADMIN])
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new category (Admin only)' })
   @ApiResponse({
@@ -93,6 +93,7 @@ export class CategoriesController {
   @Patch(':id')
   @UseGuards(AdminGuard)
   @Roles([Role.ADMIN])
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update category (Admin only)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -123,6 +124,7 @@ export class CategoriesController {
   @Delete(':id')
   @UseGuards(AdminGuard)
   @Roles([Role.ADMIN])
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete category (Admin only)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })

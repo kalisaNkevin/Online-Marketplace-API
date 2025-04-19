@@ -22,7 +22,7 @@ import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guards';
 import { Role } from '@prisma/client';
-import { UserProfileEntity } from 'src/features/users/entities/user-profile.entity';
+import { UserProfileEntity } from 'src/users/entities/user-profile.entity';
 
 @ApiTags('Users')
 @Controller('users')

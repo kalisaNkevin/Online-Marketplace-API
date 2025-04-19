@@ -23,4 +23,14 @@ export class CreateReviewDto {
   @ApiProperty({ description: 'Order ID' })
   @IsString()
   orderId: string;
+
+  @ApiProperty({ description: 'Product ID' })
+  @IsString()
+  productId: string;
+  @ApiProperty({ description: 'Store ID' })
+  @IsString()
+  storeId: string;
+  @ApiProperty({ description: 'User ID' })
+  @IsString()
+  userId: string;
 }

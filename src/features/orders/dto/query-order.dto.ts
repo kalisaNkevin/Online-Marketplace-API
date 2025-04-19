@@ -16,3 +16,7 @@ export class QueryOrderDto {
   @Min(1)
   limit?: number;
 }
+export class UpdateOrderDto {
+  @IsEnum(OrderStatus)
+  status: OrderStatus;
+}

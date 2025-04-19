@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
 import { CloudinaryService } from './cloudinary.service';
-import { PrismaModule } from 'src/prisma/prisma.module';
+import { PrismaModule } from 'src/database/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
