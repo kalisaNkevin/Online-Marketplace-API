@@ -37,9 +37,10 @@ import {
   ProductResponseDto,
 } from './dto/product-response.dto';
 import { Public } from 'src/auth/decorators/public.decorator';
-import { AdminUpdateProductDto } from './dto/admin-update-product.dto';
 import { ProductEntity } from './entities/product.entity';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
+import { ReviewEntity } from './entities/review.entity';
+import { UpdateReviewDto } from './dto/update-review.dto';
 
 @ApiTags('Products')
 @Controller('products')
@@ -141,6 +142,88 @@ export class ProductsController {
     };
   }
 
+  @Get(':id/reviews')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get all reviews for a product (Public)' })
+  @ApiParam({
+    name: 'id',
+    description: 'Product UUID',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of reviews retrieved successfully',
+    type: [ReviewEntity],
+  })
+  async getProductReviews(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ReviewEntity[]> {
+    return this.productsService.findProductReviews(id);
+  }
+
+  @Patch(':id/reviews/:reviewId')
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update a review (Owner only)' })
+  @ApiParam({
+    name: 'id',
+    description: 'Product UUID',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiParam({
+    name: 'reviewId',
+    description: 'Review UUID',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Review updated successfully',
+    type: ReviewEntity,
+  })
+  async updateReview(
+    @GetUser('id') userId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+    @Body() updateReviewDto: UpdateReviewDto,
+  ): Promise<ReviewEntity> {
+    return this.productsService.updateReview(userId, reviewId, updateReviewDto);
+  }
+
+  @Delete(':id/reviews/:reviewId')
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a review (Owner only)' })
+  @ApiParam({
+    name: 'id',
+    description: 'Product UUID',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiParam({
+    name: 'reviewId',
+    description: 'Review UUID',
+    type: 'string',
+    format: 'uuid',
+    required: true,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Review deleted successfully',
+  })
+  async deleteReview(
+    @GetUser('id') userId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+  ): Promise<{ message: string }> {
+    return this.productsService.delete(userId, reviewId);
+  }
+
   // Protected endpoint - only for sellers
   @Patch(':id')
   @UseGuards(RolesGuard)
@@ -206,7 +289,6 @@ export class ProductsController {
   ): Promise<{ message: string }> {
     return this.productsService.remove(id, req.user.storeId);
   }
-
 
   @Patch(':id/mark-featured')
   @Roles([Role.ADMIN])

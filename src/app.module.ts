@@ -12,7 +12,6 @@ import { PrismaModule } from './database/prisma.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StoresModule } from './features/stores/stores.module';
 import { CategoryModule } from './features/categories/categories.module';
-import { ReviewsModule } from './features/reviews/reviews.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { mailConfig } from './config/mail.config';
 import { EmailModule } from './email/email.module';
@@ -28,7 +27,6 @@ import { EmailModule } from './email/email.module';
     CategoryModule,
     PrismaModule,
     EmailModule,
-    ReviewsModule,
     CacheModule.register({
       ttl: 60 * 60,
     }),

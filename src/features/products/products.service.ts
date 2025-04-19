@@ -9,8 +9,9 @@ import { ProductResponseDto } from './dto/product-response.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
-import { Prisma } from '@prisma/client';
+import { OrderStatus, Prisma, Review } from '@prisma/client';
 import { ProductEntity } from './entities/product.entity';
+import { UpdateReviewDto } from './dto/update-review.dto';
 
 @Injectable()
 export class ProductsService {
@@ -150,6 +151,7 @@ export class ProductsService {
       categoryId: category,
       minPrice,
       maxPrice,
+      sortBy = 'createdAt',
       sortOrder = 'desc',
     } = query;
 
@@ -177,14 +179,26 @@ export class ProductsService {
           store: true,
           categories: true,
           variants: true,
+          Review: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
         },
-        orderBy: { [sortOrder]: 'desc' },
+        orderBy: {
+          [sortBy]: sortOrder, // This is the correct way to specify ordering
+        },
       }),
       this.prisma.product.count({ where }),
     ]);
 
     return {
-      data: products.map(this.transformProductResponse),
+      data: products.map((product) => this.transformProductResponse(product)),
       pagination: {
         total,
         page,
@@ -434,5 +448,115 @@ export class ProductsService {
 
     await this.redisService.del('featured_products');
     return this.transformProductResponse(updatedProduct);
+  }
+  private calculateAverageRating(reviews: Review[]): number | null {
+    if (!reviews.length) return null;
+    const sum = reviews.reduce((acc, rev) => acc + rev.rating, 0);
+    return Number((sum / reviews.length).toFixed(1));
+  }
+
+  private async validateOrderAndProduct(
+    userId: string,
+    productId: string,
+    orderId: string,
+  ): Promise<void> {
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: orderId,
+        userId,
+        status: OrderStatus.COMPLETED,
+        items: {
+          some: {
+            productId,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new BadRequestException(
+        'You can only review products from your completed orders',
+      );
+    }
+
+    const existingReview = await this.prisma.review.findFirst({
+      where: {
+        AND: [{ userId }, { productId }, { orderId }],
+      },
+    });
+
+    if (existingReview) {
+      throw new BadRequestException('You have already reviewed this product');
+    }
+  }
+
+  private async updateProductRating(
+    tx: Prisma.TransactionClient,
+    productId: string,
+  ): Promise<number | null> {
+    const reviews = await tx.review.findMany({ where: { productId } });
+    const averageRating = this.calculateAverageRating(reviews);
+
+    await tx.product.update({
+      where: { id: productId },
+      data: { averageRating },
+    });
+
+    return averageRating;
+  }
+
+  async updateReview(
+    userId: string,
+    reviewId: string,
+    updateReviewDto: UpdateReviewDto,
+  ): Promise<any> {
+    const review = await this.prisma.review.findFirst({
+      where: { id: reviewId, userId },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found or not owned by user');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.review.update({
+        where: { id: reviewId },
+        data: updateReviewDto,
+        include: {
+          user: { select: { name: true } },
+          product: { select: { name: true } },
+        },
+      });
+
+      await this.updateProductRating(tx, review.productId);
+
+      return updated;
+    });
+  }
+
+  async delete(userId: string, reviewId: string): Promise<{ message: string }> {
+    const review = await this.prisma.review.findFirst({
+      where: { id: reviewId, userId },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found or not owned by user');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.review.delete({ where: { id: reviewId } });
+      await this.updateProductRating(tx, review.productId);
+      return { message: 'Review deleted successfully' };
+    });
+  }
+
+  async findProductReviews(productId: string): Promise<any[]> {
+    return this.prisma.review.findMany({
+      where: { productId },
+      include: {
+        user: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }

@@ -18,7 +18,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { QueryOrderDto } from './dto/query-order.dto';
 import { OrderEntity } from './entities/order.entity';
 import { PaymentDto } from './dto/payment.dto';
-import { CreateReviewDto } from '../reviews/dto/create-review.dto';
+import { CreateReviewDto } from '../products/dto/create-review.dto';
 import { PaginatedOrdersResponse } from './interfaces/paginated-orders-response.interface';
 
 const orderInclude = {

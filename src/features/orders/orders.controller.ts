@@ -31,7 +31,7 @@ import { Role } from '@prisma/client';
 import { OrderEntity } from './entities/order.entity';
 import { PaginatedOrdersResponse } from './interfaces/paginated-orders-response.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
-import { CreateReviewDto } from '../reviews/dto/create-review.dto';
+import { CreateReviewDto } from '../products/dto/create-review.dto';
 
 @ApiTags('Orders')
 @Controller('orders')

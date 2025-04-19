@@ -1,68 +1,64 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsNumber, Min, IsEnum } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+
+export enum SortOrder {
+  ASC = 'asc',
+  DESC = 'desc',
+}
 
 export class QueryProductDto {
-  @ApiPropertyOptional({
-    description: 'Search products by name or description',
-  })
+  @ApiProperty({ required: false, default: 1 })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
   @IsOptional()
+  page?: number;
+
+  @ApiProperty({ required: false, default: 10 })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @IsOptional()
+  limit?: number;
+
+  @ApiProperty({ required: false })
   @IsString()
+  @IsOptional()
   search?: string;
 
-  @ApiPropertyOptional({
-    description: 'Filter by category ID',
-  })
-  @IsOptional()
+  @ApiProperty({ required: false })
   @IsString()
+  @IsOptional()
   categoryId?: string;
 
-  @ApiPropertyOptional({
-    description: 'Minimum price filter',
-  })
-  @IsOptional()
+  @ApiProperty({ required: false })
+  @Type(() => Number)
   @IsNumber()
-  @Min(0)
-  @Transform(({ value }) => parseFloat(value))
+  @IsOptional()
   minPrice?: number;
 
-  @ApiPropertyOptional({
-    description: 'Maximum price filter',
-  })
-  @IsOptional()
+  @ApiProperty({ required: false })
+  @Type(() => Number)
   @IsNumber()
-  @Min(0)
-  @Transform(({ value }) => parseFloat(value))
+  @IsOptional()
   maxPrice?: number;
 
-  @ApiPropertyOptional({
-    description: 'Page number for pagination',
-    default: 1,
-    minimum: 1,
+  @ApiProperty({
+    required: false,
+    enum: ['createdAt', 'price', 'name'],
+    default: 'createdAt',
   })
+  @IsString()
   @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Transform(({ value }) => parseInt(value))
-  page?: number = 1;
+  sortBy?: string;
 
-  @ApiPropertyOptional({
-    description: 'Number of items per page',
-    default: 10,
-    minimum: 1,
+  @ApiProperty({
+    required: false,
+    enum: SortOrder,
+    default: SortOrder.DESC,
   })
+  @IsEnum(SortOrder)
   @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Transform(({ value }) => parseInt(value))
-  limit?: number = 10;
-
-  @ApiPropertyOptional({
-    description: 'Sort order',
-    enum: ['asc', 'desc'],
-    default: 'desc',
-  })
-  @IsOptional()
-  @IsEnum(['asc', 'desc'])
-  sortOrder?: 'asc' | 'desc' = 'desc';
+  sortOrder?: SortOrder;
 }
