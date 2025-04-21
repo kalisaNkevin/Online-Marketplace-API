@@ -32,6 +32,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Create directories
+        run: |
+          mkdir -p coverage
+          mkdir -p badges
+
       - name: Install dependencies
         run: npm install
 
@@ -41,8 +46,13 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
 
       - name: Run tests with coverage
+        run: npm run test:cov
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+
+      - name: Verify coverage file
         run: |
-          npm run test:cov
+          ls -la coverage/
           cat coverage/coverage-summary.json
 
       - name: Create coverage badge
