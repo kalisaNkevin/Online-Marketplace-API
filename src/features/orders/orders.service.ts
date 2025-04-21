@@ -5,8 +5,6 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { RedisService } from '../../redis/redis.service';
-import { EmailService } from '../../email/email.service';
 import {
   Prisma,
   OrderStatus,
@@ -54,8 +52,6 @@ const orderInclude = {
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
-    private readonly emailService: EmailService,
   ) {}
 
   async createOrder(
@@ -226,10 +222,10 @@ export class OrdersService {
   }
 
   async getOrderById(orderId: string): Promise<OrderEntity> {
-    const cachedOrder = await this.redisService.get(`order:${orderId}`);
-    if (cachedOrder) {
-      return this.transformOrderResponse(JSON.parse(cachedOrder));
-    }
+    // const cachedOrder = await this.redisService.get(`order:${orderId}`);
+    // if (cachedOrder) {
+    //   return this.transformOrderResponse(JSON.parse(cachedOrder));
+    // }
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -240,11 +236,11 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-    await this.redisService.set(
-      `order:${orderId}`,
-      JSON.stringify(order),
-      3600,
-    );
+    // await this.redisService.set(
+    //   `order:${orderId}`,
+    //   JSON.stringify(order),
+    //   3600,
+    // );
 
     return this.transformOrderResponse(order);
   }
@@ -290,7 +286,7 @@ export class OrdersService {
     });
 
     // Update cache
-    await this.redisService.del(`order:${orderId}`);
+    // await this.redisService.del(`order:${orderId}`);
 
     return this.transformOrderResponse(updatedOrder);
   }
@@ -588,7 +584,7 @@ export class OrdersService {
     });
 
     // Invalidate cache
-    await this.redisService.del(`order:${orderId}`);
+    //await this.redisService.del(`order:${orderId}`);
 
     // Send email notification
     // await this.emailService.sendOrderStatusUpdate({

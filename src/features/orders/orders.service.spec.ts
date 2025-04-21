@@ -1,8 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrdersService } from './orders.service';
 import { PrismaService } from '../../database/prisma.service';
-import { RedisService } from '../../redis/redis.service';
-import { EmailService } from '../../email/email.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -21,8 +19,6 @@ import { CreateReviewDto } from '../products/dto/create-review.dto';
 describe('OrdersService', () => {
   let service: OrdersService;
   let prismaService: PrismaService;
-  let redisService: RedisService;
-  let emailService: EmailService;
 
   const mockOrder = {
     id: '1',
@@ -84,22 +80,12 @@ describe('OrdersService', () => {
       create: jest.fn(),
       findMany: jest.fn(),
     },
-    orderStatusHistory: {  // Add this mock
+    orderStatusHistory: {
+      // Add this mock
       create: jest.fn(),
       findMany: jest.fn(),
     },
     $transaction: jest.fn((callback) => callback(mockPrismaService)),
-  };
-
-  const mockRedisService = {
-    get: jest.fn(),
-    set: jest.fn(),
-    del: jest.fn(),
-  };
-
-  const mockEmailService = {
-    sendOrderConfirmation: jest.fn(),
-    sendOrderStatusUpdate: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -110,28 +96,16 @@ describe('OrdersService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
-        {
-          provide: RedisService,
-          useValue: mockRedisService,
-        },
-        {
-          provide: EmailService,
-          useValue: mockEmailService,
-        },
       ],
     }).compile();
 
     service = module.get<OrdersService>(OrdersService);
     prismaService = module.get<PrismaService>(PrismaService);
-    redisService = module.get<RedisService>(RedisService);
-    emailService = module.get<EmailService>(EmailService);
-
     jest.clearAllMocks();
   });
 
   describe('getOrderById', () => {
     it('should return an order', async () => {
-      mockRedisService.get.mockResolvedValue(null);
       mockPrismaService.order.findUnique.mockResolvedValue(mockOrder);
 
       const result = await service.getOrderById('1');
@@ -145,7 +119,6 @@ describe('OrdersService', () => {
     });
 
     it('should throw NotFoundException if order not found', async () => {
-      mockRedisService.get.mockResolvedValue(null);
       mockPrismaService.order.findUnique.mockResolvedValue(null);
 
       await expect(service.getOrderById('999')).rejects.toThrow(
@@ -163,7 +136,7 @@ describe('OrdersService', () => {
         orderId: '1',
         status: OrderStatus.PROCESSING,
         comment: 'Order status updated from PENDING to PROCESSING',
-        createdAt: new Date()
+        createdAt: new Date(),
       });
       mockPrismaService.order.update.mockResolvedValue({
         ...mockOrder,
@@ -184,8 +157,8 @@ describe('OrdersService', () => {
         data: {
           orderId: '1',
           status: OrderStatus.PROCESSING,
-          comment: 'Order status updated from PENDING to PROCESSING'
-        }
+          comment: 'Order status updated from PENDING to PROCESSING',
+        },
       });
     });
 
@@ -200,12 +173,12 @@ describe('OrdersService', () => {
 
   describe('addReview', () => {
     const reviewDto: CreateReviewDto = {
-        rating: 5,
-        comment: 'Great product!',
-        productId: '1',
-        orderId: '1',
-        storeId: '1',
-        userId: '1'
+      rating: 5,
+      comment: 'Great product!',
+      productId: '1',
+      orderId: '1',
+      storeId: '1',
+      userId: '1',
     };
 
     it('should add a review to an order', async () => {
@@ -218,7 +191,7 @@ describe('OrdersService', () => {
       mockPrismaService.review.findFirst.mockResolvedValue(null);
       mockPrismaService.review.findMany.mockResolvedValue([
         { rating: 4 },
-        { rating: 5 }
+        { rating: 5 },
       ]); // Add mock reviews for average calculation
       mockPrismaService.review.create.mockResolvedValue({
         id: '1',
@@ -236,7 +209,7 @@ describe('OrdersService', () => {
       expect(mockPrismaService.review.create).toHaveBeenCalled();
       expect(mockPrismaService.product.update).toHaveBeenCalledWith({
         where: { id: '1' },
-        data: { averageRating: 4.5 } // (4 + 5) / 2
+        data: { averageRating: 4.5 }, // (4 + 5) / 2
       });
     });
 

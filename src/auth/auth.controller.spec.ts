@@ -5,7 +5,7 @@ import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginUserDto } from './dto/login.dto';
 import { UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import { EmailService } from '@/email/email.service';
+
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -17,11 +17,6 @@ describe('AuthController', () => {
     logout: jest.fn(),
     refreshToken: jest.fn(),
   };
-  const MockEmailService = {
-    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
-    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
-    sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -31,10 +26,7 @@ describe('AuthController', () => {
           provide: AuthService,
           useValue: mockAuthService,
         },
-        {
-          provide: EmailService,
-          useValue: MockEmailService,
-        },
+
       ],
     }).compile();
 

@@ -3,7 +3,6 @@ import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
-import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -11,9 +10,6 @@ import { Role } from '@prisma/client';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: PrismaService;
-  let jwtService: JwtService;
-  let emailService: EmailService;
 
   const mockPrismaService = {
     user: {
@@ -33,12 +29,6 @@ describe('AuthService', () => {
     verifyAsync: jest.fn(),
   };
 
-  const mockEmailService = {
-    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
-    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
-    sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -51,10 +41,6 @@ describe('AuthService', () => {
         {
           provide: JwtService,
           useValue: mockJwtService,
-        },
-        {
-          provide: EmailService,
-          useValue: mockEmailService, // Use the full mock here
         },
         {
           provide: ConfigService,
@@ -79,9 +65,6 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prisma = module.get<PrismaService>(PrismaService);
-    jwtService = module.get<JwtService>(JwtService);
-    emailService = module.get<EmailService>(EmailService);
   });
 
   afterEach(() => {
@@ -113,7 +96,6 @@ describe('AuthService', () => {
         name: registerDto.name,
         role: registerDto.role,
       });
-      expect(mockEmailService.sendVerificationEmail).toHaveBeenCalled();
     });
 
     it('should throw DuplicateEmailException if email exists', async () => {

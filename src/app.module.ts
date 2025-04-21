@@ -13,7 +13,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StoresModule } from './features/stores/stores.module';
 import { CategoryModule } from './features/categories/categories.module';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -25,7 +24,7 @@ import { EmailModule } from './email/email.module';
     StoresModule,
     CategoryModule,
     PrismaModule,
-    EmailModule,
+
     CacheModule.register({
       ttl: 60 * 60,
     }),

@@ -4,7 +4,6 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { RedisService } from '../../redis/redis.service';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -17,7 +16,6 @@ import { UpdateReviewDto } from './dto/update-review.dto';
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
   ) {}
 
   private readonly productInclude = {
@@ -126,7 +124,7 @@ export class ProductsService {
       },
     });
 
-    await this.redisService.del('featured_products');
+    //await this.redisService.del('featured_products');
     return this.transformProductResponse(product);
   }
 
@@ -217,10 +215,10 @@ export class ProductsService {
   }
 
   async findFeatured(): Promise<ProductResponseDto[]> {
-    const cachedProducts = await this.redisService.get('featured_products');
-    if (cachedProducts) {
-      return JSON.parse(cachedProducts);
-    }
+    // const cachedProducts = await this.redisService.get('featured_products');
+    // if (cachedProducts) {
+    //   return JSON.parse(cachedProducts);
+    // }
 
     const products = await this.prisma.product.findMany({
       where: { isFeatured: true, isActive: true },
@@ -233,11 +231,11 @@ export class ProductsService {
     });
 
     const transformed = products.map(this.transformProductResponse);
-    await this.redisService.set(
-      'featured_products',
-      JSON.stringify(transformed),
-      3600,
-    );
+    // await this.redisService.set(
+    //   'featured_products',
+    //   JSON.stringify(transformed),
+    //   3600,
+    // );
 
     return transformed;
   }
@@ -306,9 +304,9 @@ export class ProductsService {
       },
     });
 
-    if (updated.isFeatured) {
-      await this.redisService.del('featured_products');
-    }
+    // if (updated.isFeatured) {
+    //   await this.redisService.del('featured_products');
+    // }
 
     return this.transformProductResponse(updated);
   }
@@ -341,18 +339,18 @@ export class ProductsService {
     });
 
     // Clear cache if it was a featured product
-    if (product.isFeatured) {
-      await this.redisService.del('featured_products');
-    }
+    // if (product.isFeatured) {
+    //   await this.redisService.del('featured_products');
+    // }
 
     return { message: 'Product deleted successfully' };
   }
 
   async getFeaturedProducts(): Promise<ProductResponseDto[]> {
-    const cachedProducts = await this.redisService.get('featured_products');
-    if (cachedProducts) {
-      return JSON.parse(cachedProducts);
-    }
+    // const cachedProducts = await this.redisService.get('featured_products');
+    // if (cachedProducts) {
+    //   return JSON.parse(cachedProducts);
+    // }
 
     const products = await this.prisma.product.findMany({
       where: {
@@ -387,11 +385,11 @@ export class ProductsService {
 
     const transformedProducts = products.map(this.transformProductResponse);
 
-    await this.redisService.set(
-      'featured_products',
-      JSON.stringify(transformedProducts),
-      3600,
-    );
+    // await this.redisService.set(
+    //   'featured_products',
+    //   JSON.stringify(transformedProducts),
+    //   3600,
+    // );
 
     return transformedProducts;
   }
@@ -446,7 +444,7 @@ export class ProductsService {
       },
     });
 
-    await this.redisService.del('featured_products');
+    // await this.redisService.del('featured_products');
     return this.transformProductResponse(updatedProduct);
   }
   private calculateAverageRating(reviews: Review[]): number | null {

@@ -6,7 +6,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from 'src/database/prisma.module';
 import { UsersModule } from 'src/users/users.module';
-import { EmailModule } from 'src/email/email.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from './guards/jwt-auth.guards';
 
@@ -15,7 +14,6 @@ import { JwtAuthGuard } from './guards/jwt-auth.guards';
   imports: [
     PrismaModule,
     UsersModule,
-    EmailModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

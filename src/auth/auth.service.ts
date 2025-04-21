@@ -10,7 +10,6 @@ import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { EmailService } from '@/email/email.service';
 import { LoginUserDto } from './dto/login.dto';
 import { PrismaService } from '../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -18,9 +17,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-    private readonly emailService: EmailService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {}
@@ -45,11 +42,7 @@ export class AuthService {
       },
     });
 
-    // Send verification email
-    await this.emailService.sendVerificationEmail(
-      user.email,
-      verificationToken,
-    );
+ 
 
     return {
       id: user.id,
