@@ -1,6 +1,6 @@
 # Online Marketplace API
 
-![Coverage](./coverage/badge.svg)
+[![Coverage](https://kalisakevin.github.io/Online-Marketplace-API/badges/coverage.svg)](https://github.com/kalisakevin/Online-Marketplace-API/actions)
 
 A robust e-commerce platform built with NestJS, featuring real-time order processing, payment integration, and advanced caching.
 

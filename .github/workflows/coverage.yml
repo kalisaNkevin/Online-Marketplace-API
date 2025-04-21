@@ -8,21 +8,51 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Install dependencies
         run: npm install
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Run tests
         run: npm run test:cov
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+          JWT_SECRET: test_secret
+          JWT_EXPIRES_IN: 1h
+          JWT_REFRESH_SECRET: test_refresh_secret
+          JWT_REFRESH_EXPIRES_IN: 7d
+
       - name: Generate coverage badge
         uses: jaywcjlove/coverage-badges-cli@main
         with:
           source: coverage/coverage-summary.json
           output: coverage/badge.svg
+
       - name: Commit coverage badge
         uses: EndBug/add-and-commit@v9
         with:
