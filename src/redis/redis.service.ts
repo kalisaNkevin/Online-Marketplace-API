@@ -1,9 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
-import { Inject } from '@nestjs/common';
 import { CachedOrder } from 'src/features/orders/interfaces/order.interface';
 import { OrderEntity } from '../features/orders/entities/order.entity';
 
@@ -65,5 +64,24 @@ export class RedisService {
 
   async invalidateStoreOrders(storeId: string): Promise<void> {
     await this.del(`store:${storeId}:orders`);
+  }
+
+  async addToQueue(jobName: string, data: any): Promise<void> {
+    try {
+      await this.orderQueue.add(jobName, data);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async removeFromQueue(jobId: string): Promise<void> {
+    const job = await this.orderQueue.getJob(jobId);
+    if (job) {
+      await job.remove();
+    }
+  }
+
+  async getQueueLength(): Promise<number> {
+    return this.orderQueue.count();
   }
 }
