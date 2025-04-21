@@ -1,4 +1,5 @@
-name: Coverage
+name: Codecov
+
 on:
   push:
     branches: [main]
@@ -6,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  codecov:
     runs-on: ubuntu-latest
 
     services:
@@ -32,11 +33,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Create directories
-        run: |
-          mkdir -p coverage
-          mkdir -p badges
-
       - name: Install dependencies
         run: npm install
 
@@ -49,24 +45,17 @@ jobs:
         run: npm run test:cov
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+          JWT_SECRET: test_secret
+          JWT_EXPIRES_IN: 1h
+          JWT_REFRESH_SECRET: test_refresh_secret
+          JWT_REFRESH_EXPIRES_IN: 7d
+          CLOUDINARY_CLOUD_NAME: test_cloud
+          CLOUDINARY_API_KEY: test_key
+          CLOUDINARY_API_SECRET: test_secret
 
-      - name: Verify coverage file
-        run: |
-          ls -la coverage/
-          cat coverage/coverage-summary.json
-
-      - name: Create coverage badge
-        if: success()
-        uses: jaywcjlove/coverage-badges-cli@main
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
         with:
-          source: coverage/coverage-summary.json
-          output: ./badges/coverage.svg
-
-      - name: Deploy badge
-        if: success()
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./badges
-          destination_dir: badges
-          keep_files: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: true
