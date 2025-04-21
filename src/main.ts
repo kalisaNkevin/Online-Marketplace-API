@@ -12,17 +12,29 @@ export class LoggerService extends Logger {}
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Update Helmet configuration
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: [`'self'`],
+          styleSrc: [`'self'`, `'unsafe-inline'`],
+          imgSrc: [`'self'`, 'data:', 'https:'],
+          scriptSrc: [`'self'`, `'unsafe-inline'`, `'unsafe-eval'`],
+        },
+      },
     }),
   );
 
   app.enableCors({
-    origin: ['http://localhost:3000'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    origin: [
+      'http://localhost:3000',
+      'https://online-marketplace-api-oqr9.onrender.com',
+    ],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: [
       'Origin',
@@ -31,12 +43,14 @@ async function bootstrap() {
       'Accept',
       'Authorization',
       'Access-Control-Allow-Credentials',
+      'Access-Control-Allow-Origin'
     ],
     exposedHeaders: ['Authorization'],
-    maxAge: 3600,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+    maxAge: 3600
   });
 
-  // Rate limiting
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000,
@@ -47,7 +61,6 @@ async function bootstrap() {
     }),
   );
 
-  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -65,7 +78,9 @@ async function bootstrap() {
       'RESTful API for an online marketplace that allows users to buy and sell products, manage their inventory and process orders.',
     )
     .addTag('Authentication')
+    .addServer('https://online-marketplace-api-oqr9.onrender.com', 'Production')
     .addServer('http://localhost:3000', 'Development')
+
     .addBearerAuth(
       {
         type: 'http',
