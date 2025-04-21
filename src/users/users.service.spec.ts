@@ -41,6 +41,8 @@ describe('UsersService', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      findMany: jest.fn(),
+      delete: jest.fn(),
     },
   };
 
@@ -66,7 +68,30 @@ describe('UsersService', () => {
     jest.clearAllMocks();
   });
 
+  describe('findByEmail', () => {
+    it('should return a user if found', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      const result = await service.findByEmail('test@example.com');
+      expect(result).toEqual(mockUser);
+    });
+
+    it('should return null if user not found', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      const result = await service.findByEmail('nonexistent@example.com');
+      expect(result).toBeNull();
+    });
+  });
+
   describe('findById', () => {
+    it('should return a user if found', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      const result = await service.findById('1');
+      expect(result).toEqual(mockUser);
+    });
+
+    it('should throw NotFoundException if id is empty', async () => {
+      await expect(service.findById('')).rejects.toThrow(NotFoundException);
+    });
 
     it('should throw NotFoundException if user not found', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
@@ -110,7 +135,7 @@ describe('UsersService', () => {
       mockPrismaService.user.update.mockResolvedValueOnce(updatedUser);
 
       const result = await service.updateProfile('1', updateDto);
-      
+
       expect(result).toEqual(updatedUser);
       expect(mockPrismaService.user.update).toHaveBeenCalledWith({
         where: { id: '1' },
@@ -122,14 +147,133 @@ describe('UsersService', () => {
           role: true,
           isActive: true,
           updatedAt: true,
-        }
+        },
       });
     });
 
     it('should throw NotFoundException if user not found', async () => {
-      mockPrismaService.user.update.mockRejectedValueOnce(new NotFoundException());
-      await expect(service.updateProfile('999', updateDto))
-        .rejects.toThrow(NotFoundException);
+      mockPrismaService.user.update.mockRejectedValueOnce(
+        new NotFoundException(),
+      );
+      await expect(service.updateProfile('999', updateDto)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('updateRefreshToken', () => {
+    it('should update refresh token', async () => {
+      const updatedUser = { ...mockUser, refreshToken: 'new-token' };
+      mockPrismaService.user.update.mockResolvedValue(updatedUser);
+
+      const result = await service.updateRefreshToken('1', 'new-token');
+      expect(result.refreshToken).toBe('new-token');
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: { refreshToken: 'new-token' },
+      });
+    });
+
+    it('should set refresh token to null', async () => {
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockUser,
+        refreshToken: null,
+      });
+      const result = await service.updateRefreshToken('1', null);
+      expect(result.refreshToken).toBeNull();
+    });
+  });
+
+  describe('updateResetToken', () => {
+    it('should update reset token', async () => {
+      const updatedUser = { ...mockUser, resetToken: 'reset-token' };
+      mockPrismaService.user.update.mockResolvedValue(updatedUser);
+
+      const result = await service.updateResetToken('1', 'reset-token');
+      expect(result.resetToken).toBe('reset-token');
+    });
+
+    it('should clear reset token', async () => {
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockUser,
+        resetToken: null,
+      });
+      const result = await service.updateResetToken('1', null);
+      expect(result.resetToken).toBeNull();
+    });
+  });
+
+  describe('updatePassword', () => {
+    it('should update user password', async () => {
+      const hashedPassword = await bcrypt.hash('newpassword', 10);
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockUser,
+        password: hashedPassword,
+      });
+
+      const result = await service.updatePassword('1', hashedPassword);
+      expect(result.password).toBe(hashedPassword);
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: { password: hashedPassword },
+      });
+    });
+  });
+
+  describe('findAll', () => {
+    it('should return array of users', async () => {
+      const users = [
+        mockUser,
+        { ...mockUser, id: '2', email: 'test2@example.com' },
+      ];
+      mockPrismaService.user.findMany.mockResolvedValue(users);
+
+      const result = await service.findAll();
+      expect(result).toEqual(users);
+      expect(mockPrismaService.user.findMany).toHaveBeenCalledWith({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    });
+  });
+
+  describe('deactivateUser', () => {
+    it('should deactivate user', async () => {
+      const deactivatedUser = { ...mockUser, isActive: false };
+      mockPrismaService.user.update.mockResolvedValue(deactivatedUser);
+
+      const result = await service.deactivateUser('1');
+      expect(result.isActive).toBe(false);
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: { isActive: false },
+      });
+    });
+  });
+
+  describe('deleteUser', () => {
+    it('should delete user', async () => {
+      mockPrismaService.user.delete.mockResolvedValue(mockUser);
+
+      const result = await service.deleteUser('1');
+      expect(result).toEqual(mockUser);
+      expect(mockPrismaService.user.delete).toHaveBeenCalledWith({
+        where: { id: '1' },
+      });
+    });
+
+    it('should throw error if user not found', async () => {
+      mockPrismaService.user.delete.mockRejectedValue(
+        new Error('User not found'),
+      );
+      await expect(service.deleteUser('999')).rejects.toThrow('User not found');
     });
   });
 });

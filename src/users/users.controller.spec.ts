@@ -9,95 +9,163 @@ describe('UsersController', () => {
   let controller: UsersController;
   let mockUsersService: jest.Mocked<Partial<UsersService>>;
 
-  // Mock user with all required properties
-  const mockUser = {
+  // Test data
+  const mockUserData = {
     id: '1',
     email: 'test@example.com',
     name: 'Test User',
     role: Role.SHOPPER,
     password: 'hashedPassword123',
-    phoneNumber: '',
-    address: '',
-    city: '',
-    country: '',
-    postalCode: '',
-    avatar: '',
+    phoneNumber: '1234567890',
+    address: '123 Test St',
+    city: 'Test City',
+    country: 'Test Country',
+    postalCode: '12345',
+    avatar: 'avatar.jpg',
     dateOfBirth: new Date(),
     gender: Gender.OTHER,
-    bio: '',
+    bio: 'Test bio',
     isEmailVerified: false,
     isActive: true,
     preferredLanguage: 'en',
     lastLogin: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
+    verificationToken: null,
+    refreshToken: null,
+    resetToken: null,
+  };
+
+  const mockAdminRequest = { user: { role: Role.ADMIN, id: '1' } };
+  const mockShopperRequest = { user: { role: Role.SHOPPER, id: '2' } };
+  const mockUpdateProfileDto: UpdateProfileDto = {
+    name: 'Updated Name',
+    phoneNumber: '9876543210',
+    address: 'New Address',
   };
 
   beforeEach(async () => {
-    // Create fresh mocks for each test
     mockUsersService = {
       findById: jest.fn(),
       updateProfile: jest.fn(),
-      findByEmail: jest.fn(),
+      findAll: jest.fn(),
+      deactivateUser: jest.fn(),
+      deleteUser: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
-      providers: [
-        {
-          provide: UsersService,
-          useValue: mockUsersService,
-        },
-      ],
+      providers: [{ provide: UsersService, useValue: mockUsersService }],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
   });
 
-  describe('getProfile', () => {
-    it('should return user profile', async () => {
-      const req = { user: { id: '1' } };
-      mockUsersService.findById.mockResolvedValue(mockUser);
-      const result = await controller.getProfile(req);
-      expect(result).toEqual(mockUser);
-      expect(mockUsersService.findById).toHaveBeenCalledWith(req.user.id);
+  describe('Profile Operations', () => {
+    describe('getProfile', () => {
+      it('should return user profile', async () => {
+        mockUsersService.findById.mockResolvedValue(mockUserData);
+        const result = await controller.getProfile({ user: { id: '1' } });
+        expect(result).toEqual(mockUserData);
+      });
+
+      it('should throw NotFoundException for invalid user', async () => {
+        mockUsersService.findById.mockRejectedValue(new NotFoundException());
+        await expect(
+          controller.getProfile({ user: { id: '999' } })
+        ).rejects.toThrow(NotFoundException);
+      });
     });
 
-    it('should throw NotFoundException if user not found', async () => {
-      const req = { user: { id: '999' } };
-      mockUsersService.findById.mockRejectedValue(new NotFoundException());
+    describe('updateProfile', () => {
+      it('should update profile successfully', async () => {
+        const updatedUser = { ...mockUserData, ...mockUpdateProfileDto };
+        mockUsersService.updateProfile.mockResolvedValue(updatedUser);
+        
+        const result = await controller.updateProfile(
+          { user: { sub: '1' } },
+          mockUpdateProfileDto
+        );
+        
+        expect(result).toEqual(updatedUser);
+      });
 
-      await expect(controller.getProfile(req)).rejects.toThrow(
-        NotFoundException,
-      );
+      it('should handle update failures', async () => {
+        mockUsersService.updateProfile.mockRejectedValue(new NotFoundException());
+        await expect(
+          controller.updateProfile({ user: { sub: '999' } }, mockUpdateProfileDto)
+        ).rejects.toThrow(NotFoundException);
+      });
     });
   });
 
-  describe('getUserById', () => {
-    it('should return user by id', async () => {
-      mockUsersService.findById.mockResolvedValue(mockUser);
-      const request = { user: { role: Role.ADMIN } };
+  describe('Admin Operations', () => {
+    describe('getAllUsers', () => {
+      it('should allow admin access', async () => {
+        const users = [mockUserData, { ...mockUserData, id: '2' }];
+        mockUsersService.findAll.mockResolvedValue(users);
+        
+        const result = await controller.getAllUsers(mockAdminRequest);
+        expect(result).toEqual(users);
+      });
 
-      const result = await controller.getUserById('1', request);
-
-      expect(result).toEqual(mockUser);
-      expect(mockUsersService.findById).toHaveBeenCalledWith('1');
+      it('should forbid non-admin access', async () => {
+        await expect(
+          controller.getAllUsers(mockShopperRequest)
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockUsersService.findAll).not.toHaveBeenCalled();
+      });
     });
 
-    it('should throw NotFoundException if user not found', async () => {
-      mockUsersService.findById.mockRejectedValue(new NotFoundException());
-      const request = { user: { role: Role.ADMIN } };
+    describe('deactivateUser', () => {
+      it('should allow admin to deactivate users', async () => {
+        const deactivatedUser = { ...mockUserData, isActive: false };
+        mockUsersService.deactivateUser.mockResolvedValue(deactivatedUser);
+        
+        const result = await controller.deactivateUser('2', mockAdminRequest);
+        expect(result).toEqual(deactivatedUser);
+      });
 
-      await expect(controller.getUserById('999', request)).rejects.toThrow(
-        NotFoundException,
-      );
+      it('should prevent non-admin deactivation', async () => {
+        await expect(
+          controller.deactivateUser('1', mockShopperRequest)
+        ).rejects.toThrow(ForbiddenException);
+      });
     });
 
-    it('should throw ForbiddenException if user is not an admin', async () => {
-      const req = { user: { role: Role.SHOPPER } };
-      await expect(controller.getUserById('1', req)).rejects.toThrow(
-        ForbiddenException,
-      );
+    describe('deleteUser', () => {
+      it('should allow admin to delete other users', async () => {
+        mockUsersService.deleteUser.mockResolvedValue(mockUserData);
+        
+        const result = await controller.deleteUser('2', mockAdminRequest);
+        expect(result).toEqual(mockUserData);
+      });
+
+      it('should prevent self-deletion', async () => {
+        const adminUserRequest = { 
+          user: { 
+            id: '1',    // Same ID as the one being deleted
+            role: Role.ADMIN 
+          } 
+        };
+        
+        await expect(
+          controller.deleteUser('1', adminUserRequest)
+        ).rejects.toThrow(ForbiddenException);
+        
+        expect(mockUsersService.deleteUser).not.toHaveBeenCalled();
+      });
+
+      it('should handle non-existent users', async () => {
+        mockUsersService.deleteUser.mockRejectedValue(new NotFoundException());
+        await expect(
+          controller.deleteUser('999', mockAdminRequest)
+        ).rejects.toThrow(NotFoundException);
+      });
     });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 });

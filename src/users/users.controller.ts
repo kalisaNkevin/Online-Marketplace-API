@@ -23,6 +23,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guards';
 import { Role } from '@prisma/client';
 import { UserProfileEntity } from 'src/users/entities/user-profile.entity';
+import { AdminGuard } from '@/auth/guards/admin.guard';
 
 @ApiTags('Users')
 @Controller('users')
@@ -102,15 +103,16 @@ export class UsersController {
   }
 
   @Delete('admin/users/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete user (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID to delete' })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
   async deleteUser(@Param('id') id: string, @Request() req) {
-    if (req.user.role !== Role.ADMIN) {
-      throw new ForbiddenException('Admin access required');
+    // Prevent admin from deleting their own account
+    if (req.user.id === id) {
+      throw new ForbiddenException('Admins cannot delete their own account');
     }
     return this.usersService.deleteUser(id);
   }
