@@ -29,31 +29,24 @@ export class StoreMetricsDto {
 }
 
 export class StoreResponseDto {
-  @ApiProperty({ example: 'store-123' })
   id: string;
-
-  @ApiProperty({ example: 'Fashion Store' })
   name: string;
-
-  @ApiProperty({ required: false, example: 'Best fashion store in town' })
-  description?: string;
-
-  @ApiProperty({ example: 'user-123' })
+  description: string;
   ownerId: string;
-
-  @ApiProperty({ type: StoreOwnerDto })
-  owner?: StoreOwnerDto;
-
-  @ApiProperty({ type: [StoreProductDto] })
-  products: StoreProductDto[];
-
-  @ApiProperty({ type: StoreMetricsDto })
-  metrics?: StoreMetricsDto;
-
-  @ApiProperty({ example: '2025-04-18T06:29:05.249Z' })
+  owner: {
+    name: string;
+    email: string;
+  };
+  products: {
+    id: string;
+    name: string;
+    price: Decimal;
+  }[];
+  metrics: {
+    totalProducts: number;
+    averageProductRating: number;
+  };
   createdAt: Date;
-
-  @ApiProperty({ example: '2025-04-18T06:29:05.249Z' })
   updatedAt: Date;
 }
 

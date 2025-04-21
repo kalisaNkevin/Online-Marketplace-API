@@ -33,8 +33,14 @@ export class UsersService {
 
   // Find a user by their unique ID
   async findById(id: string) {
+    if (!id) {
+      throw new NotFoundException('User ID is required');
+    }
+
     const user = await this.prisma.user.findUnique({
-      where: { id },
+      where: {
+        id: id,
+      },
       select: {
         id: true,
         email: true,
@@ -59,7 +65,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException(`User not found`);
     }
 
     return user;

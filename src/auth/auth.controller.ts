@@ -2,26 +2,16 @@ import {
   Controller,
   Post,
   Body,
-  UseGuards,
-  Request,
-  Delete,
-  NotFoundException,
-  InternalServerErrorException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiBearerAuth,
   ApiBody,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginUserDto } from './dto/login.dto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guards';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { Public } from './decorators/public.decorator';

@@ -104,20 +104,43 @@ export class StoresService {
           ownerId: true,
           createdAt: true,
           updatedAt: true,
+          owner: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
           products: {
             select: {
               id: true,
               name: true,
               price: true,
+              averageRating: true,
             },
+          },
+          _count: {
+            select: { products: true },
           },
         },
       }),
       this.prisma.store.count(),
     ]);
 
+    // Transform the data to match StoreResponseDto
+    const transformedStores = stores.map((store) => ({
+      ...store,
+      metrics: {
+        totalProducts: store._count.products,
+        averageProductRating:
+          store.products.reduce(
+            (acc, product) => acc + (product.averageRating?.toNumber() || 0),
+            0,
+          ) / store.products.length || 0,
+      },
+    }));
+
     return {
-      data: stores,
+      data: transformedStores,
       pagination: {
         total,
         page,

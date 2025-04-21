@@ -19,6 +19,12 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": false,
     "lib": ["esnext"],
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "paths": {
+      "@/*": ["src/*"],
+      "@auth/*": ["src/auth/*"],
+      "@features/*": ["src/features/*"],
+      "@common/*": ["src/common/*"]
+    }
   }
 }

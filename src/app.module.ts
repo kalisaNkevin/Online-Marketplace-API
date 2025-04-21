@@ -13,7 +13,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StoresModule } from './features/stores/stores.module';
 import { CategoryModule } from './features/categories/categories.module';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { mailConfig } from './config/mail.config';
 import { EmailModule } from './email/email.module';
 
 @Module({
@@ -30,13 +29,24 @@ import { EmailModule } from './email/email.module';
     CacheModule.register({
       ttl: 60 * 60,
     }),
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ envFilePath: '.env', isGlobal: true }),
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: mailConfig,
+      useFactory: async (config: ConfigService) => ({
+        transport: {
+          host: config.get<string>('SMTP_HOST'),
+          port: config.get<number>('SMTP_PORT'),
+          secure: config.get<boolean>('SMTP_SECURE'),
+          auth: {
+            user: config.get<string>('SMTP_USER'),
+            pass: config.get<string>('SMTP_PASSWORD'),
+          },
+        },
+        defaults: {
+          from: `"${config.get<string>('MAIL_FROM_NAME')}" <${config.get<string>('MAIL_FROM_ADDRESS')}>`,
+        },
+      }),
     }),
   ],
   controllers: [AppController, OrdersController],

@@ -10,10 +10,9 @@ import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { EmailService } from 'src/email/email.service';
+import { EmailService } from '@/email/email.service';
 import { LoginUserDto } from './dto/login.dto';
 import { PrismaService } from '../database/prisma.service';
-import { DuplicateEmailException } from '../common/exceptions/duplicate-email.exception';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -29,7 +28,7 @@ export class AuthService {
   async register(createUserDto: CreateUserDto) {
     const emailExists = await this.checkEmailExists(createUserDto.email);
     if (emailExists) {
-      throw new DuplicateEmailException(createUserDto.email);
+      throw new BadRequestException(createUserDto.email);
     }
 
     const salt = await bcrypt.genSalt();
@@ -83,7 +82,10 @@ export class AuthService {
   }
 
   async login(loginUserDto: LoginUserDto) {
-    const user = await this.validateUser(loginUserDto.email, loginUserDto.password);
+    const user = await this.validateUser(
+      loginUserDto.email,
+      loginUserDto.password,
+    );
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -96,29 +98,28 @@ export class AuthService {
     // For sellers, check if they have an associated store
     if (user.role === 'SELLER') {
       const store = await this.prisma.store.findFirst({
-        where: { ownerId: user.id }
+        where: { ownerId: user.id },
       });
-      
+
       if (!store) {
-        throw new ForbiddenException('Seller must create a store before creating products');
+        throw new ForbiddenException(
+          'Seller must create a store before creating products',
+        );
       }
 
       // Include store information in the payload
-      const payload = { 
+      const payload = {
         sub: user.id,
         email: user.email,
         role: user.role,
-        storeId: store.id // Add store ID to payload
+        storeId: store.id, // Add store ID to payload
       };
 
       const [accessToken, refreshToken] = await Promise.all([
-        this.jwtService.signAsync(
-          payload,
-          {
-            secret: this.configService.get('JWT_SECRET'),
-            expiresIn: '1h',
-          },
-        ),
+        this.jwtService.signAsync(payload, {
+          secret: this.configService.get('JWT_SECRET'),
+          expiresIn: '1h',
+        }),
         this.jwtService.signAsync(
           { sub: user.id, storeId: store.id }, // Include storeId in refresh token
           {
@@ -137,20 +138,17 @@ export class AuthService {
     }
 
     // For non-sellers, continue with regular payload
-    const payload = { 
+    const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
     };
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(
-        payload,
-        {
-          secret: this.configService.get('JWT_SECRET'),
-          expiresIn: '1h', // Explicit expiration
-        },
-      ),
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get('JWT_SECRET'),
+        expiresIn: '1h', // Explicit expiration
+      }),
       this.jwtService.signAsync(
         { sub: user.id },
         {
@@ -216,7 +214,7 @@ export class AuthService {
   async refreshToken(refreshToken: string) {
     try {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: this.configService.get('JWT_REFRESH_SECRET'),
       });
 
       const user = await this.prisma.user.findFirst({
@@ -236,16 +234,16 @@ export class AuthService {
           email: user.email,
         },
         {
-          secret: process.env.JWT_SECRET,
-          expiresIn: parseInt(process.env.JWT_EXPIRATION, 10),
+          secret: this.configService.get('JWT_SECRET'),
+          expiresIn: this.configService.get('JWT_EXPIRATION'),
         },
       );
 
       const newRefreshToken = await this.jwtService.signAsync(
         { sub: user.id },
         {
-          secret: process.env.JWT_REFRESH_SECRET,
-          expiresIn: parseInt(process.env.JWT_REFRESH_EXPIRATION, 10),
+          secret: this.configService.get('JWT_REFRESH_SECRET'),
+          expiresIn: this.configService.get('JWT_REFRESH_EXPIRATION'),
         },
       );
 
@@ -270,10 +268,10 @@ export class AuthService {
         stores: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
 
     if (user && (await bcrypt.compare(password, user.password))) {

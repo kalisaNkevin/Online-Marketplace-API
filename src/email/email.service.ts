@@ -1,193 +1,119 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MailerService } from '@nestjs-modules/mailer';
-import { OrderStatus, PaymentMethod } from '@prisma/client';
-
-interface OrderStatusUpdateParams {
-  to: string;
-  orderNumber: string;
-  status: OrderStatus;
-  items: Array<{
-    productName: string;
-    quantity: number;
-    price: number;
-  }>;
-  total: number;
-}
-
-interface PaymentConfirmationParams {
-  to: string;
-  orderNumber: string;
-  amount: number;
-  paymentMethod: PaymentMethod;
-}
-
-interface OrderDetails {
-  orderNumber: string;
-  items: Array<{
-    productName: string;
-    quantity: number;
-    price: number;
-    total: number;
-  }>;
-  total: number;
-  shippingAddress: {
-    street: string;
-    city: string;
-    state: string;
-    country: string;
-    postalCode: string;
-  };
-}
+import * as nodemailer from 'nodemailer';
+import {
+  EmailResult,
+  OrderDetails,
+  OrderStatusUpdateParams,
+  PaymentConfirmationParams,
+} from './interfaces/email.interfaces';
+import { EmailTemplates } from './templates/email.templates';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
+  private readonly transporter: nodemailer.Transporter;
   private readonly fromEmail: string;
+  private readonly fromName: string;
 
-  constructor(
-    private readonly mailerService: MailerService,
-    private readonly configService: ConfigService,
-  ) {
+  constructor(private readonly configService: ConfigService) {
+    // Updated transporter configuration with proper TLS settings
+    this.transporter = nodemailer.createTransport({
+      host: this.configService.get<string>('SMTP_HOST'),
+      port: this.configService.get<number>('SMTP_PORT'),
+      secure: false, // true for 465, false for other ports
+      requireTLS: true, // Force TLS
+      auth: {
+        user: this.configService.get<string>('SMTP_USER'),
+        pass: this.configService.get<string>('SMTP_PASSWORD'),
+      },
+      tls: {
+        ciphers: 'SSLv3',
+        rejectUnauthorized: false // Only use this in development
+      },
+    });
+
     this.fromEmail = this.configService.get<string>('MAIL_FROM_ADDRESS');
+    this.fromName = this.configService.get<string>('MAIL_FROM_NAME');
+
+    // Verify SMTP connection on service initialization
+    this.verifyConnection();
   }
 
-  async sendEmail(to: string, subject: string, html: string): Promise<void> {
+  public async verifyConnection(): Promise<void> {
     try {
-      await this.mailerService.sendMail({
-        to,
-        from: this.fromEmail,
-        subject,
-        html,
-      });
-      this.logger.log(`Email sent successfully to ${to}`);
+      await this.transporter.verify();
+      this.logger.log('SMTP connection established successfully');
     } catch (error) {
-      this.logger.error(`Failed to send email to ${to}: ${error}`);
+      this.logger.error(`SMTP connection failed: ${error}`);
       throw error;
     }
   }
 
-  async sendVerificationEmail(email: string, token: string): Promise<void> {
+  private async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+  ): Promise<EmailResult> {
+    try {
+      const info = await this.transporter.sendMail({
+        from: `"${this.fromName}" <${this.fromEmail}>`,
+        to,
+        subject,
+        html,
+      });
+
+      this.logger.log(
+        `Email sent successfully to ${to} (ID: ${info.messageId})`,
+      );
+      return { success: true, messageId: info.messageId };
+    } catch (error) {
+      this.logger.error(`Failed to send email to ${to}: ${error}`);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  async sendVerificationEmail(
+    email: string,
+    token: string,
+  ): Promise<EmailResult> {
     const frontendUrl = this.configService.get('FRONTEND_URL');
-    const html = this.getVerificationEmailTemplate(frontendUrl, token);
-    await this.sendEmail(email, 'Verify Your Email', html);
+    const html = EmailTemplates.getVerificationEmail(frontendUrl, token);
+    return this.sendEmail(email, 'Verify Your Email', html);
   }
 
-  async sendWelcomeEmail(email: string): Promise<void> {
-    const html = this.getWelcomeEmailTemplate();
-    await this.sendEmail(email, 'Welcome to Our Service', html);
+  async sendWelcomeEmail(email: string): Promise<EmailResult> {
+    const html = EmailTemplates.getWelcomeEmail();
+    return this.sendEmail(email, 'Welcome to Our Service', html);
   }
 
-  async sendOrderConfirmation(email: string, orderDetails: OrderDetails): Promise<void> {
-    const html = this.getOrderConfirmationTemplate(orderDetails);
-    await this.sendEmail(email, 'Order Confirmation', html);
+  async sendOrderConfirmation(
+    email: string,
+    orderDetails: OrderDetails,
+  ): Promise<EmailResult> {
+    const html = EmailTemplates.getOrderConfirmation(orderDetails);
+    return this.sendEmail(email, 'Order Confirmation', html);
   }
 
-  async sendOrderStatusUpdate(params: OrderStatusUpdateParams): Promise<void> {
-    const html = this.getOrderStatusTemplate(params);
-    await this.sendEmail(
+  async sendOrderStatusUpdate(
+    params: OrderStatusUpdateParams,
+  ): Promise<EmailResult> {
+    const html = EmailTemplates.getOrderStatusUpdate(params);
+    return this.sendEmail(
       params.to,
       `Order ${params.orderNumber} Status Update`,
       html,
     );
   }
 
-  async sendPaymentConfirmation(params: PaymentConfirmationParams): Promise<void> {
-    const html = this.getPaymentConfirmationTemplate(params);
-    await this.sendEmail(
+  async sendPaymentConfirmation(
+    params: PaymentConfirmationParams,
+  ): Promise<EmailResult> {
+    const html = EmailTemplates.getPaymentConfirmation(params);
+    return this.sendEmail(
       params.to,
       `Payment Confirmation - Order ${params.orderNumber}`,
       html,
     );
-  }
-
-  private getVerificationEmailTemplate(frontendUrl: string, token: string): string {
-    return `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Email Verification</h2>
-        <p>Please verify your email address by clicking the link below:</p>
-        <a href="${frontendUrl}/verify-email?token=${token}" 
-           style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-          Verify Email
-        </a>
-      </div>
-    `;
-  }
-
-  private getWelcomeEmailTemplate(): string {
-    return `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Welcome!</h2>
-        <p>Thank you for joining us. We are excited to have you on board.</p>
-      </div>
-    `;
-  }
-
-  private getOrderConfirmationTemplate(orderDetails: OrderDetails): string {
-    return `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Order Confirmation</h2>
-        <p>Thank you for your order #${orderDetails.orderNumber}!</p>
-        <h3>Order Details:</h3>
-        <table style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr>
-              <th style="text-align: left;">Product</th>
-              <th style="text-align: right;">Quantity</th>
-              <th style="text-align: right;">Price</th>
-              <th style="text-align: right;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${orderDetails.items.map(item => `
-              <tr>
-                <td style="padding: 8px 0;">${item.productName}</td>
-                <td style="text-align: right;">${item.quantity}</td>
-                <td style="text-align: right;">$${item.price.toFixed(2)}</td>
-                <td style="text-align: right;">$${item.total.toFixed(2)}</td>
-              </tr>
-            `).join('')}
-            <tr>
-              <td colspan="3" style="text-align: right; padding-top: 16px;"><strong>Total:</strong></td>
-              <td style="text-align: right; padding-top: 16px;"><strong>$${orderDetails.total.toFixed(2)}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-        <h3>Shipping Address:</h3>
-        <p>
-          ${orderDetails.shippingAddress.street}<br>
-          ${orderDetails.shippingAddress.city}, ${orderDetails.shippingAddress.state} ${orderDetails.shippingAddress.postalCode}<br>
-          ${orderDetails.shippingAddress.country}
-        </p>
-      </div>
-    `;
-  }
-
-  private getOrderStatusTemplate(params: OrderStatusUpdateParams): string {
-    return `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Order Status Update</h2>
-        <p>Order: #${params.orderNumber}</p>
-        <p>Status: <strong>${params.status}</strong></p>
-        <h3>Order Items:</h3>
-        <ul>
-          ${params.items.map(item => `
-            <li>${item.quantity}x ${item.productName} - $${item.price.toFixed(2)}</li>
-          `).join('')}
-        </ul>
-        <p><strong>Total: $${params.total.toFixed(2)}</strong></p>
-      </div>
-    `;
-  }
-
-  private getPaymentConfirmationTemplate(params: PaymentConfirmationParams): string {
-    return `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Payment Confirmation</h2>
-        <p>Order: #${params.orderNumber}</p>
-        <p>Amount: $${params.amount.toFixed(2)}</p>
-        <p>Payment Method: ${params.paymentMethod}</p>
-      </div>
-    `;
   }
 }

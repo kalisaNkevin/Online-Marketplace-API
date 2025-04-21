@@ -40,7 +40,7 @@ export class UsersController {
     type: UserProfileEntity,
   })
   async getProfile(@Request() req): Promise<UserProfileEntity> {
-    const user = await this.usersService.findById(req.user.sub);
+    const user = await this.usersService.findById(req.user.id);
     const {
       ...profile
     } = user;
