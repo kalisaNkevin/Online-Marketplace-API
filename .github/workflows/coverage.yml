@@ -38,23 +38,23 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Run tests
-        run: npm run test:cov
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
-          JWT_SECRET: test_secret
-          JWT_EXPIRES_IN: 1h
-          JWT_REFRESH_SECRET: test_refresh_secret
-          JWT_REFRESH_EXPIRES_IN: 7d
+      - name: Run tests with coverage
+        run: |
+          npm run test:cov
+          cat coverage/coverage-summary.json
 
-      - name: Generate coverage badge
+      - name: Create coverage badge
+        if: success()
         uses: jaywcjlove/coverage-badges-cli@main
         with:
           source: coverage/coverage-summary.json
-          output: coverage/badge.svg
+          output: ./badges/coverage.svg
 
-      - name: Commit coverage badge
-        uses: EndBug/add-and-commit@v9
+      - name: Deploy badge
+        if: success()
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          add: 'coverage/badge.svg'
-          message: 'docs: update coverage badge'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./badges
+          destination_dir: badges
+          keep_files: true

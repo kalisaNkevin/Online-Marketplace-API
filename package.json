@@ -15,7 +15,7 @@
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch --config jest.config.ts",
-    "test:cov": "jest --config jest.config.ts --coverage",
+    "test:cov": "jest --coverage --coverageReporters json-summary --coverageReporters lcov --coverageReporters text",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:e2e:watch": "jest --config ./test/jest-e2e.json --runInBand --watch",
