@@ -165,7 +165,7 @@ describe('ProductsService', () => {
       const cachedProducts = [
         {
           ...mockProduct,
-          price: mockProduct.price.toString(), // Convert Decimal to string
+          price: mockProduct.price.toString(), 
           createdAt: mockProduct.createdAt.toISOString(),
           updatedAt: mockProduct.updatedAt.toISOString(),
         },

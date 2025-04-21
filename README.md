@@ -1,10 +1,6 @@
 # Online Marketplace API
 
-![Coverage Statements](./coverage/badges/badge-statements.svg)
-![Coverage Branches](./coverage/badges/badge-branches.svg)
-![Coverage Functions](./coverage/badges/badge-functions.svg)
-![Coverage Lines](./coverage/badges/badge-lines.svg)
-
+![Coverage](./coverage/badge.svg)
 
 A robust e-commerce platform built with NestJS, featuring real-time order processing, payment integration, and advanced caching.
 

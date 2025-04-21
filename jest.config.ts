@@ -8,15 +8,8 @@ const config: Config.InitialOptions = {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
   collectCoverageFrom: ['**/*.(t|j)s'],
-  coverageDirectory: './coverage',
-  collectCoverage: true,
-  coverageReporters: [
-    'json',
-    'lcov',
-    'text',
-    'clover',
-    'json-summary', // Make sure this is included
-  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['json', 'lcov', 'text', 'clover', 'json-summary'],
   testEnvironment: 'node',
   moduleNameMapper: {
     '^src/(.*)$': '<rootDir>/$1',

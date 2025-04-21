@@ -13,7 +13,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
-    "test": "jest --config jest.config.ts",
+    "test": "jest",
     "test:watch": "jest --watch --config jest.config.ts",
     "test:cov": "jest --config jest.config.ts --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -31,7 +31,7 @@
     "prisma:migrate:status": "prisma migrate status",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
-    "make-badges": "jest --config jest.config.ts --coverage --coverageReporters='json-summary' && jest-coverage-badges"
+    "make-badges": "jest --config jest.config.ts --coverage --coverageReporters json-summary lcov text && jest-coverage-badges --output coverage/badges"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
