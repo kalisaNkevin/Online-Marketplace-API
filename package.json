@@ -30,7 +30,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:status": "prisma migrate status",
     "db:push": "prisma db push",
-    "db:seed": "prisma db seed",
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force",
     "make-badges": "jest --config jest.config.ts --coverage --coverageReporters=json-summary && jest-coverage-badges --output coverage/badges"
   },
   "dependencies": {
