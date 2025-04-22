@@ -3,13 +3,12 @@ services:
     name: online-marketplace-api
     runtime: node
     buildCommand: |
-      npm i -g @nestjs/cli
-      npm ci
-      npx prisma generate
+      npm install
       npm run build
     preDeployCommand: |
+      npx prisma generate
       npx prisma migrate deploy
-      NODE_ENV=production npx prisma db seed
+      npx prisma db seed
     startCommand: npm run start:prod
     envVars:
       - key: NODE_ENV
