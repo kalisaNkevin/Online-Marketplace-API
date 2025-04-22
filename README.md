@@ -82,6 +82,7 @@ graph TD
 ## 🗄 Database Schema
 
 ![Database Schema](./docs/assets/database-schema.svg)
+<img src="docs/assets/database-schema.svg" alt="Database Schema" width="100%">
 
 ## 🛠️ Prerequisites
 
