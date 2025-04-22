@@ -9,10 +9,11 @@ import { ProductsModule } from './features/products/products.module';
 import { UploadsModule } from './features/uploads/uploads.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { PrismaModule } from './database/prisma.module';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { StoresModule } from './features/stores/stores.module';
 import { CategoryModule } from './features/categories/categories.module';
-import { MailerModule } from '@nestjs-modules/mailer';
+import { MailModule } from './mail/mail.module';
+
 
 @Module({
   imports: [
@@ -29,24 +30,8 @@ import { MailerModule } from '@nestjs-modules/mailer';
       ttl: 60 * 60,
     }),
     ConfigModule.forRoot({ envFilePath: '.env', isGlobal: true }),
-    MailerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (config: ConfigService) => ({
-        transport: {
-          host: config.get<string>('SMTP_HOST'),
-          port: config.get<number>('SMTP_PORT'),
-          secure: config.get<boolean>('SMTP_SECURE'),
-          auth: {
-            user: config.get<string>('SMTP_USER'),
-            pass: config.get<string>('SMTP_PASSWORD'),
-          },
-        },
-        defaults: {
-          from: `"${config.get<string>('MAIL_FROM_NAME')}" <${config.get<string>('MAIL_FROM_ADDRESS')}>`,
-        },
-      }),
-    }),
+
+    MailModule,
   ],
   controllers: [AppController, OrdersController],
   providers: [AppService],

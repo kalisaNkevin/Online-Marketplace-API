@@ -8,6 +8,9 @@ import { PrismaModule } from 'src/database/prisma.module';
 import { UsersModule } from 'src/users/users.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from './guards/jwt-auth.guards';
+import { MailService } from '@/mail/mail.service';
+import { MailModule } from '@/mail/mail.module';
+
 
 @Global()
 @Module({
@@ -25,10 +28,12 @@ import { JwtAuthGuard } from './guards/jwt-auth.guards';
       }),
       inject: [ConfigService],
     }),
+    MailModule,
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
+    MailService,
     JwtStrategy,
     {
       provide: 'APP_GUARD',

@@ -11,7 +11,7 @@ export class LoggerService extends Logger {}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Trust proxy for rate limiting
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
@@ -35,14 +35,22 @@ async function bootstrap() {
 
   // Update CORS configuration
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'https://online-marketplace-api-oqr9.onrender.com',
-      'https://api.jabocollection.com',
-      'https://jabocollection.com',
-      'https://*.jabocollection.com', // Allow all subdomains
-      process.env.FRONTEND_URL, // Add your frontend URL from env
-    ].filter(Boolean), // Remove any undefined values
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'https://jabocollection.com',
+        'https://www.jabocollection.com',
+        'https://api.jabocollection.com',
+        process.env.FRONTEND_URL,
+      ].filter(Boolean);
+
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: [
@@ -52,12 +60,8 @@ async function bootstrap() {
       'Accept',
       'Authorization',
       'Access-Control-Allow-Credentials',
-      'Access-Control-Allow-Origin'
     ],
     exposedHeaders: ['Authorization'],
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-    maxAge: 3600
   });
 
   app.use(
@@ -88,7 +92,6 @@ async function bootstrap() {
     )
     .addTag('Authentication')
     .addServer('https://api.jabocollection.com', 'Production')
-    .addServer('https://online-marketplace-api-oqr9.onrender.com', 'Staging')
     .addServer('http://localhost:3000', 'Development')
 
     .addBearerAuth(

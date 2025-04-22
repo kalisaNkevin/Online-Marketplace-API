@@ -13,6 +13,9 @@ import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { LoginUserDto } from './dto/login.dto';
 import { PrismaService } from '../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { MailService } from '@/mail/mail.service';
+
+
 
 @Injectable()
 export class AuthService {
@@ -20,6 +23,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly mailerSendService: MailService,
   ) {}
 
   async register(createUserDto: CreateUserDto) {
@@ -42,7 +46,11 @@ export class AuthService {
       },
     });
 
- 
+    // Send welcome email
+    await this.mailerSendService.sendUserConfirmation(
+      user,
+      verificationToken
+    );
 
     return {
       id: user.id,
