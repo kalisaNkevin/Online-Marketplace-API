@@ -33,6 +33,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'https://online-marketplace-api-oqr9.onrender.com',
+      'https://api.jabocollection.com',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
@@ -78,7 +79,8 @@ async function bootstrap() {
       'RESTful API for an online marketplace that allows users to buy and sell products, manage their inventory and process orders.',
     )
     .addTag('Authentication')
-    .addServer('https://online-marketplace-api-oqr9.onrender.com', 'Production')
+    .addServer('https://api.jabocollection.com', 'Production')
+    .addServer('https://online-marketplace-api-oqr9.onrender.com', 'Satging')
     .addServer('http://localhost:3000', 'Development')
 
     .addBearerAuth(
