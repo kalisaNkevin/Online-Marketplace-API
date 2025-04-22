@@ -81,8 +81,9 @@ graph TD
 
 ## 🗄 Database Schema
 
-![Database Schema](./docs/assets/diagram.svg)
-<img src="docs/assets/diagram.svg" alt="Database Schema" width="100%">
+<div style="background-color: white; padding: 20px;">
+    <img src="./docs/assets/diagram.svg" alt="Database Schema" width="100%">
+</div>
 
 ## 🛠️ Prerequisites
 
