@@ -4,12 +4,19 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { UsersService } from '../users/users.service';
+import { MailService } from '../mail/mail.service';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
 
 describe('AuthService', () => {
   let service: AuthService;
+
+  // Add mock for MailService
+  const mockMailService = {
+    sendUserConfirmation: jest.fn().mockResolvedValue(true),
+    sendPasswordResetEmail: jest.fn().mockResolvedValue(true),
+  };
 
   const mockPrismaService = {
     user: {
@@ -60,6 +67,10 @@ describe('AuthService', () => {
               }
             }),
           },
+        },
+        {
+          provide: MailService,
+          useValue: mockMailService,
         },
       ],
     }).compile();
@@ -298,6 +309,35 @@ describe('AuthService', () => {
 
       await expect(service.refreshToken(oldRefreshToken)).rejects.toThrow(
         UnauthorizedException,
+      );
+    });
+  });
+
+  // Add new test for email sending during registration
+  describe('register with email', () => {
+    it('should send welcome email on successful registration', async () => {
+      const registerDto = {
+        email: 'test@example.com',
+        password: 'Password123!',
+        name: 'Test User',
+        role: Role.SHOPPER,
+      };
+
+      const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+      const user = {
+        id: '1',
+        ...registerDto,
+        password: hashedPassword,
+      };
+
+      mockPrismaService.user.findUnique.mockResolvedValueOnce(null);
+      mockPrismaService.user.create.mockResolvedValueOnce(user);
+
+      await service.register(registerDto);
+
+      expect(mockMailService.sendUserConfirmation).toHaveBeenCalledWith(
+        user,
+        expect.any(String), // verification token
       );
     });
   });

@@ -17,14 +17,12 @@ describe('AppController', () => {
   describe('root', () => {
     it('should return welcome message object', () => {
       const result = appController.getHello();
-      expect(result).toEqual({
-        message: 'Welcome to Jabo collection API!',
-      });
+      expect(result).toEqual('Welcome to Jabo collection API!');
     });
 
     it('should contain correct welcome message', () => {
       const result = appController.getHello();
-      expect(result.message).toBe('Welcome to Jabo collection API!');
+      expect(result).toBe('Welcome to Jabo collection API!');
     });
   });
 });
