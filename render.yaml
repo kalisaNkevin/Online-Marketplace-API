@@ -2,8 +2,8 @@ services:
   - type: web
     name: online-marketplace-api
     runtime: node
-    plan: free
     buildCommand: |
+      npm i -g @nestjs/cli
       npm ci
       npx prisma generate
       npm run build

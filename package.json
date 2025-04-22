@@ -6,7 +6,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build": "npx nest build",
+    "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -32,7 +32,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "make-badges": "jest --config jest.config.ts --coverage --coverageReporters=json-summary && jest-coverage-badges --output coverage/badges",
-    "render-build": "npm ci && npx nest build",
+    "render-build": "npm i -g @nestjs/cli && nest build",
     "render-start": "node dist/src/main"
   },
   "dependencies": {
@@ -47,6 +47,7 @@
     "@nestjs/platform-express": "^11.0.16",
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.1.1",
+    "@nestjs/cli": "^11.0.6",
     "@prisma/client": "^6.6.0",
     "@sendgrid/mail": "^8.1.5",
     "bcrypt": "^5.1.1",
@@ -72,7 +73,6 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.6",
     "@nestjs/schematics": "^11.0.4",
     "@nestjs/testing": "^11.0.14",
     "@types/bcrypt": "^5.0.2",
