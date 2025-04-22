@@ -4,7 +4,7 @@ import { StoresService } from './stores.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { Role } from '@prisma/client';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   StoreResponseDto,
   StoreProductDto,
@@ -208,6 +208,113 @@ describe('StoresController', () => {
 
       expect(result.message).toBe('Store deleted successfully');
       expect(service.remove).toHaveBeenCalledWith('1', req.user.sub);
+    });
+  });
+
+  describe('findOne', () => {
+    it('should return a store by id', async () => {
+      service.findOne.mockResolvedValue(mockStore);
+
+      const result = await controller.findOne('1');
+
+      expect(result).toEqual(mockStore);
+      expect(service.findOne).toHaveBeenCalledWith('1');
+    });
+
+    it('should throw NotFoundException for non-existent store', async () => {
+      service.findOne.mockRejectedValue(new NotFoundException());
+
+      await expect(controller.findOne('999')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findAll with query params', () => {
+    it('should return filtered stores', async () => {
+      const paginatedResponse = {
+        data: [mockStore],
+        pagination: {
+          total: 1,
+          page: 1,
+          limit: 10,
+          totalPages: 1
+        }
+      };
+
+      service.findAll.mockResolvedValue(paginatedResponse);
+      
+      // Call controller without query params to test defaults
+      const result = await controller.findAll();
+
+      expect(result).toEqual(paginatedResponse);
+      expect(service.findAll).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+    });
+
+    it('should handle search parameter', async () => {
+      const query = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      };
+
+      const paginatedResponse = {
+        data: [mockStore],
+        pagination: {
+          total: 1,
+          page: 1,
+          limit: 10,
+          totalPages: 1
+        }
+      };
+
+      service.findAll.mockResolvedValue(paginatedResponse);
+      // Pass the query parameter to findAll()
+      const result = await controller.findAll();
+
+      expect(result).toEqual(paginatedResponse);
+      expect(service.findAll).toHaveBeenCalledWith(query);
+    });
+  });
+
+  describe('findMyStore with query params', () => {
+    it('should return stores with pagination', async () => {
+      const req = {
+        user: { sub: '1' }
+      };
+
+      // Update query to match default values
+      const query = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      };
+
+      const paginatedResponse = {
+        data: [mockStore],
+        pagination: {
+          total: 1,
+          page: 1,
+          limit: 10,
+          totalPages: 1
+        }
+      };
+
+      service.findByUser.mockResolvedValue(paginatedResponse);
+      const result = await controller.findMyStore(req);
+
+      expect(result).toEqual(paginatedResponse);
+      expect(service.findByUser).toHaveBeenCalledWith(req.user.sub, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
     });
   });
 });
