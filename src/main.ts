@@ -10,13 +10,14 @@ import rateLimit from 'express-rate-limit';
 export class LoggerService extends Logger {}
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
   // Trust proxy for rate limiting
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
 
-  // Update Helmet configuration
+  // Update Helmet configuration for subdomain
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -24,31 +25,64 @@ async function bootstrap() {
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
       contentSecurityPolicy: {
         directives: {
-          defaultSrc: [`'self'`],
-          styleSrc: [`'self'`, `'unsafe-inline'`],
-          imgSrc: [`'self'`, 'data:', 'https:'],
-          scriptSrc: [`'self'`, `'unsafe-inline'`, `'unsafe-eval'`],
+          defaultSrc: [`'self'`, 'https://*.jabocollection.com'],
+          styleSrc: [
+            `'self'`,
+            `'unsafe-inline'`,
+            'https://*.jabocollection.com',
+          ],
+          imgSrc: [
+            `'self'`,
+            'data:',
+            'https://*.jabocollection.com',
+            'https:',
+            'http:',
+          ],
+          scriptSrc: [
+            `'self'`,
+            `'unsafe-inline'`,
+            `'unsafe-eval'`,
+            'https://*.jabocollection.com',
+            'https://cdn.jsdelivr.net',
+          ],
+          connectSrc: [
+            `'self'`,
+            'https://*.jabocollection.com',
+            'wss://*.jabocollection.com',
+          ],
+          fontSrc: [
+            `'self'`,
+            'https://*.jabocollection.com',
+            'https:',
+            'data:',
+          ],
+          objectSrc: [`'none'`],
+          mediaSrc: [`'self'`, 'https://*.jabocollection.com'],
+          frameSrc: [`'self'`, 'https://*.jabocollection.com'],
         },
       },
     }),
   );
 
-  // Update CORS configuration
+  // Update CORS configuration for subdomains
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://jabocollection.com',
+    'https://*.jabocollection.com', // Wildcard for all subdomains
+    process.env.FRONTEND_URL,
+  ].filter(Boolean);
+
   app.enableCors({
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'https://jabocollection.com',
-        'https://www.jabocollection.com',
-        'https://api.jabocollection.com',
-        process.env.FRONTEND_URL,
-      ].filter(Boolean);
-
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('jabocollection.com')
+      ) {
         callback(null, true);
       } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
+        callback(new Error('Not allowed by CORS'));
       }
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -85,15 +119,12 @@ async function bootstrap() {
   app.use(cookieParser());
 
   const config = new DocumentBuilder()
-    .setTitle('Online Marketplace API')
+    .setTitle('Jabo Collection API')
     .setVersion('1.0')
-    .setDescription(
-      'RESTful API for an online marketplace that allows users to buy and sell products, manage their inventory and process orders.',
-    )
+    .setDescription('The Jabo Collection API documentation')
     .addTag('Authentication')
     .addServer('https://api.jabocollection.com', 'Production')
     .addServer('http://localhost:3000', 'Development')
-
     .addBearerAuth(
       {
         type: 'http',
@@ -108,9 +139,39 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
+
+  // Enable CORS for Swagger UI
+  app.use('/api-docs', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header(
+      'Access-Control-Allow-Methods',
+      'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    );
+    res.header(
+      'Access-Control-Allow-Headers',
+      'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+    );
+    next();
+  });
+
+  SwaggerModule.setup('api-docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      withCredentials: true,
+    },
+    customSiteTitle: 'Jabo Collection API Documentation',
+  });
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
+
+  logger.log(`Application running on port ${port}`);
+  logger.log(
+    `API Documentation available at http://localhost:${port}/api-docs`,
+  );
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+  console.error('Application failed to start:', err);
+  process.exit(1);
+});
