@@ -11,6 +11,10 @@ export class LoggerService extends Logger {}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  // Trust proxy for rate limiting
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
 
   // Update Helmet configuration
   app.use(
@@ -29,12 +33,16 @@ async function bootstrap() {
     }),
   );
 
+  // Update CORS configuration
   app.enableCors({
     origin: [
       'http://localhost:3000',
       'https://online-marketplace-api-oqr9.onrender.com',
       'https://api.jabocollection.com',
-    ],
+      'https://jabocollection.com',
+      'https://*.jabocollection.com', // Allow all subdomains
+      process.env.FRONTEND_URL, // Add your frontend URL from env
+    ].filter(Boolean), // Remove any undefined values
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: [
@@ -80,7 +88,7 @@ async function bootstrap() {
     )
     .addTag('Authentication')
     .addServer('https://api.jabocollection.com', 'Production')
-    .addServer('https://online-marketplace-api-oqr9.onrender.com', 'Satging')
+    .addServer('https://online-marketplace-api-oqr9.onrender.com', 'Staging')
     .addServer('http://localhost:3000', 'Development')
 
     .addBearerAuth(
