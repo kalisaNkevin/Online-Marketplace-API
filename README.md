@@ -46,19 +46,21 @@ An advanced e-commerce platform built with NestJS, featuring real-time order pro
 
 ```mermaid
 graph TD
-    Client[Client Applications] -->|HTTP/REST| API[API Gateway]
-    API -->|Auth| Auth[Authentication]
-    API -->|Products| PM[Product Management]
-    API -->|Orders| OM[Order Management]
-    API -->|Users| UM[User Management]
+    Client[Client Apps] -->|HTTP/REST| API[API Gateway]
+    API --> Auth[Authentication]
+    API --> PM[Product Management]
+    API --> OM[Order Management]
     
-    PM -->|Cache| Redis[(Redis Cache)]
-    OM -->|Queue| RQ[(Redis Queue)]
+    OM -->|Publish| RMQ[RabbitMQ]
+    RMQ -->|Consume| OrderWorker[Order Worker]
+    RMQ -->|Consume| NotificationWorker[Notification Worker]
+    RMQ -->|Consume| PaymentWorker[Payment Worker]
     
-    PM --> DB[(PostgreSQL)]
-    OM --> DB
-    UM --> DB
-    Auth --> DB
+    subgraph Database
+        PM --> DB[(PostgreSQL)]
+        OM --> DB
+        Auth --> DB
+    end
 ```
 
 ## 🗄 Database Schema
