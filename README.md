@@ -42,6 +42,22 @@ An advanced e-commerce platform built with NestJS, featuring real-time order pro
   - Product reviews and ratings
   - Payment processing (PayPack integration)
 
+## 🏗 Architecture Overview
+
+This application follows a modular monolithic architecture:
+
+- **Modular Design**: Each feature is a separate module
+- **Shared Infrastructure**: Common database and caching
+- **Message Queue**: RabbitMQ for async operations
+- **Caching Layer**: Redis for performance optimization
+
+### Key Benefits
+
+- Simplified deployment
+- Easier maintenance
+- Better resource utilization
+- Clear upgrade path
+
 ## 🏗 System Architecture
 
 ```mermaid
