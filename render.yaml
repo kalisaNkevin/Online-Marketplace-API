@@ -6,10 +6,11 @@ services:
     buildCommand: |
       npm install
       npm run build
+    preDeployCommand: |
       npm run prisma:generate
-    startCommand: |
-      npm run prisma:migrate:deploy
       npm run db:seed
+      npm run prisma:migrate:deploy
+    startCommand: |
       npm run start:prod
     envVars:
       - key: NODE_ENV
