@@ -1,8 +1,19 @@
-# Online Marketplace API
+# Online Marketplace API 🛍️
 
 [![codecov](https://codecov.io/gh/kalisaNkevin/Online-Marketplace-API/branch/main/graph/badge.svg?token=WXYRQRJ2SD)](https://codecov.io/gh/kalisaNkevin/Online-Marketplace-API)
 
-A robust e-commerce platform built with NestJS, featuring real-time order processing, payment integration, and advanced caching.
+An advanced e-commerce platform built with NestJS, featuring real-time order processing, secure payments, and Redis caching.
+
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [Prerequisites](#-prerequisites)
+- [Installation Guide](#-installation-guide)
+- [Development Setup](#-development-setup)
+- [Testing Guide](#-testing-guide)
+- [Database & Caching](#-database--caching)
+- [Deployment](#-deployment)
+- [Troubleshooting](#-troubleshooting)
 
 ## 🚀 Features
 
@@ -54,87 +65,123 @@ graph TD
 
 [![](https://mermaid.ink/img/pako:eNqtVktz2jAQ_isazeRGMphHAN_S0M4wOZSB5NLhokqL0cSWXFmGEuC_d-UHGExC8-CArf0-rfYtbyjXAqhPwQwlCwyLZorg7ykBQ7bb62u9IVOrDRCf6JVK6uhPI3DhkzhkHM7gE1hKWCFhZaQ9R7hnxiK8YIjlaH5gAY-NFil3DD2fgykU3DMLgTbrOovniHyBvb4SrFo8shAhe0ZZHAMzCZFqRs_SnX0HthAgiNWvcPfOzqgBDnKJRpwwd8jcbg8OOO5vCLUKkkJvzs_j6vRuj03mWlkmy1QcaNXjs2DmcTK2VFJx5KAjp11dke_KSrsmQ5hLJa3UR7ne5O-4ehoNiRRk_FBKptZIFRCImAzJ06k4Zkmy0kaciBWLoBRNdAjE4N8Jx8DcQLJ41M-galAC9gj4plEBU0Qmd9xi2Ev5EMP8KCMg3AC-ijtbQ9JYVJHdcRW-4XkmSTE8I0F-PLzhYSESkHAjYxfbLzBvX0CXc-NsqaemZs7utF8u-Z64CB05n4mLDlyfCwvWWPg_cQEuIxaS2Ei-p4-UJUImXKfKVmVoBn-uFYKaVsWlQrYEwwKYMIsnf0EW8vZ7d5Fk26aW2TRB893j1FCrLQtL4ZitI1C22BBXV7V-y7AJ4KgExeE8jAleSrTgqwKQTZVLQdAZs1YtcV5sR4DL6p-UZRPpbEnc2XFqOE45qHWFse9Px6fasBiqlw7ljvhx7z9uYXEpvDsor9r3Sjad2eaor4qi4zpyRfcpV2iDBkYK6luTQoNGYPC-wSXN3JpRuwCct9RdpgLmLA2tu0l3uC1m6pfWUbnT6DRYUH_OwgRX-UHFl89eip2Dzt27OUN9z-v3Mi3U39C_1L_uNG-aA8_rtrxO-3bQ67YadI20_k3P81rNdq8_aHc7vX5n16Av2cHNm0Gv3-p0e-2ud9vHp7f7B6t07qQ)
 
-## 🛠 Prerequisites
+## 🛠️ Prerequisites
 
-- Node.js v16 or higher
-- PostgreSQL 14+
-- Redis 6+
-- npm or yarn
-- Git
+### Required Software
 
-## ⚙️ Installation
+- Node.js v16+ (`brew install node`)
+- PostgreSQL 14+ (`brew install postgresql@14`)
+- Redis 6+ (`brew install redis`)
+- Git (`brew install git`)
+- Docker (optional, for containerization)
 
-1. **Clone the repository**
+### Development Tools
+
+- VS Code with extensions:
+  - ESLint
+  - Prettier
+  - REST Client
+  - Docker
+  - PostgreSQL
+
+## 📥 Installation Guide
+
+1. **System Setup**
 
 ```bash
-git clone https://github.com/yourusername/online-marketplace-api.git
-cd online-marketplace-api
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install required software
+brew install node postgresql@14 redis git
 ```
 
-2. **Install dependencies**
+2. **Project Setup**
 
 ```bash
+# Clone repository
+git clone https://github.com/kalisaNkevin/Online-Marketplace-API.git
+cd Online-Marketplace-API
+
+# Install dependencies
 npm install
-```
 
-3. **Set up environment variables**
-
-```bash
+# Setup environment
 cp .env.example .env
 ```
 
-4. **Configure your .env file**
-
-```env
-# Database
-DATABASE_URL="postgresql://username:password@localhost:5432/marketplace"
-
-# JWT
-JWT_SECRET="your-super-secret-key"
-JWT_EXPIRATION="1h"
-JWT_REFRESH_SECRET="your-refresh-secret-key"
-JWT_REFRESH_EXPIRATION="7d"
-
-# Redis
-REDIS_HOST="localhost"
-REDIS_PORT=6379
-
-# Email
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
-SMTP_USER="your-email@gmail.com"
-SMTP_PASS="your-app-specific-password"
-
-# PayPack (Payment)
-PAYPACK_API_KEY="your-paypack-api-key"
-PAYPACK_SECRET_KEY="your-paypack-secret-key"
-```
-
-5. **Set up the database**
+3. **Database Setup**
 
 ```bash
-# Generate Prisma client
-npx prisma generate
+# Start PostgreSQL
+brew services start postgresql@14
+
+# Create database
+createdb marketplace
 
 # Run migrations
+npx prisma generate
 npx prisma migrate dev
 ```
 
-## 🚀 Running the Application
+4. **Redis Setup**
 
 ```bash
-# Development
-npm run start:dev
+# Start Redis
+brew services start redis
 
-# Production
-npm run build
-npm run start:prod
-
-# Watch mode
-npm run start:debug
+# Verify Redis is running
+redis-cli ping
 ```
 
-## 🧪 Testing
+## 💻 Development Setup
+
+### Environment Configuration
+
+```env
+# Required Environment Variables
+NODE_ENV=development
+PORT=3000
+
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/marketplace
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# JWT
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRES_IN=1h
+
+# PayPack Integration
+PAYPACK_API_KEY=your_api_key
+PAYPACK_SECRET_KEY=your_secret_key
+```
+
+### Starting Development Server
+
+```bash
+# Development mode
+npm run start:dev
+
+# Debug mode
+npm run start:debug
+
+# Production mode
+npm run build
+npm run start:prod
+```
+
+## 🧪 Testing Guide
+
+### Prerequisites
+
+- All services (PostgreSQL, Redis) must be running
+- Test database should be created
+- Environment variables properly configured
+
+### Running Tests
 
 ```bash
 # Unit tests
@@ -147,13 +194,130 @@ npm run test:e2e
 npm run test:cov
 ```
 
+### Test Database Setup
+
+```bash
+# Create test database
+createdb marketplace_test
+
+# Run migrations on test database
+NODE_ENV=test npx prisma migrate deploy
+```
+
+## 🗄️ Database & Caching
+
+### Database Management
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Create migration
+npx prisma migrate dev --name migration_name
+
+# Reset database
+npx prisma migrate reset
+```
+
+### Redis Commands
+
+```bash
+# Monitor Redis
+redis-cli monitor
+
+# Clear Redis cache
+redis-cli FLUSHALL
+```
+
+## 🚀 Deployment
+
+### Production Checklist
+
+- [ ] Update environment variables
+- [ ] Run production builds
+- [ ] Configure SSL certificates
+- [ ] Setup database backups
+- [ ] Configure monitoring
+
+### Docker Deployment
+
+```bash
+# Build image
+docker build -t marketplace-api .
+
+# Run container
+docker run -p 3000:3000 marketplace-api
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Issues**
+
+```bash
+# Check PostgreSQL status
+brew services list
+
+# Restart PostgreSQL
+brew services restart postgresql@14
+```
+
+2. **Redis Connection Issues**
+
+```bash
+# Check Redis status
+brew services list
+
+# Restart Redis
+brew services restart redis
+```
+
+3. **Port Conflicts**
+
+```bash
+# Check ports in use
+lsof -i :3000
+lsof -i :5432
+```
+
+### Logs
+
+- Application logs: `logs/app.log`
+- Error logs: `logs/error.log`
+- Access logs: `logs/access.log`
+
 ## 📚 API Documentation
 
-Once running, access the Swagger documentation at:
+### Swagger UI Access
 
-```
-http://localhost:3000/api-docs
-```
+- Local Development: `http://localhost:3000/api-docs`
+- Production: `https://api.jabocollection.com/api-docs`
+
+### Using Swagger UI
+
+1. Open the Swagger UI URL in your browser
+2. Click "Authorize" button to authenticate:
+
+   ```json
+   {
+     "Authorization": "Bearer your_jwt_token"
+   }
+   ```
+
+3. Expand any endpoint to see:
+   - Required parameters
+   - Request body schema
+   - Response examples
+   - Available response codes
+
+### Authentication in Swagger
+
+1. Login using `/auth/login` endpoint
+2. Copy the JWT token from the response
+3. Click "Authorize" button at the top
+4. Paste your token with format: `Bearer your_token_here`
+5. All subsequent requests will include authentication
 
 ### Key Endpoints
 
