@@ -1,14 +1,5 @@
-import {
-  Controller,
-  Post,
-  Body,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBody,
-} from '@nestjs/swagger';
+import { Controller, Post, Body, Get, Query, Res } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginUserDto } from './dto/login.dto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
@@ -16,11 +7,16 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { Public } from './decorators/public.decorator';
 import { LogoutDto } from './dto/logout.dto';
+import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -93,11 +89,10 @@ export class AuthController {
     const user = await this.authService.register(createUserDto);
     return {
       statusCode: 201,
-      message: 'User registration successful',
+      message: user.message || 'User registration successful',
       data: {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
+        userId: user.user.id,
+        email: user.user.email,
       },
     };
   }
@@ -185,5 +180,18 @@ export class AuthController {
   })
   async logout(@Body() logoutDto: LogoutDto) {
     return await this.authService.logout(logoutDto.refreshToken);
+  }
+
+  @Public()
+  @Get('verify-email')
+  @ApiOperation({ summary: 'Verify email address' })
+  @ApiResponse({ status: 200, description: 'Email verified successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid verification token' })
+  async verifyEmail(@Query('token') token: string) {
+    await this.authService.verifyEmail(token);
+    return {
+      statusCode: 200,
+      message: 'Email verified successfully. You can now log in.',
+    };
   }
 }

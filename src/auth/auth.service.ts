@@ -4,6 +4,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
@@ -15,10 +16,10 @@ import { PrismaService } from '../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from '@/mail/mail.service';
 
-
-
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
@@ -36,31 +37,34 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: createUserDto.email,
-        password: hashedPassword,
-        name: createUserDto.name,
-        role: createUserDto.role,
-        verificationToken,
-      },
-    });
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          ...createUserDto,
+          password: hashedPassword,
+          verificationToken,
+          isEmailVerified: false,
+        },
+      });
 
-    // Send welcome email
-    await this.mailerSendService.sendUserConfirmation(
-      user,
-      verificationToken
-    );
+      await this.mailerSendService.sendUserConfirmation(user, verificationToken);
 
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    };
+      return {
+        message:
+          'Registration successful. Please check your email to verify your account.',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Registration failed:', error);
+      throw new InternalServerErrorException('Failed to register user');
+    }
   }
 
-  async verifyEmail(token: string) {
+  async verifyEmail(token: string): Promise<void> {
     const user = await this.prisma.user.findFirst({
       where: { verificationToken: token },
     });
@@ -69,17 +73,19 @@ export class AuthService {
       throw new BadRequestException('Invalid verification token');
     }
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        isEmailVerified: true,
-        verificationToken: null,
-      },
-    });
-
-    return {
-      message: 'Email verified successfully',
-    };
+    try {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isEmailVerified: true,
+          verificationToken: null,
+          updatedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to verify email for user ${user.id}:`, error);
+      throw new InternalServerErrorException('Failed to verify email');
+    }
   }
 
   async login(loginUserDto: LoginUserDto) {
@@ -171,21 +177,21 @@ export class AuthService {
     refreshToken: string,
   ): Promise<{ statusCode: number; message: string }> {
     try {
-      // Verify the refresh token
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
+      const decoded = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.configService.get('JWT_REFRESH_SECRET'),
       });
 
-      // Find user and clear refresh token
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
+      const user = await this.prisma.user.findFirst({
+        where: {
+          id: decoded.sub,
+          refreshToken,
+        },
       });
 
-      if (!user || user.refreshToken !== refreshToken) {
+      if (!user) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      // Clear the refresh token
       await this.prisma.user.update({
         where: { id: user.id },
         data: { refreshToken: null },
@@ -199,9 +205,7 @@ export class AuthService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        'Failed to process logout request',
-      );
+      throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
@@ -209,6 +213,9 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
+    if (user) {
+      throw new BadRequestException(`User with email ${email} already exists`);
+    }
     return !!user;
   }
 

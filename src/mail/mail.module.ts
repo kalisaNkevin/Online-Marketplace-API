@@ -5,33 +5,37 @@ import { MailService } from './mail.service';
 import { join } from 'path';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
-@Global() // 👈 optional to make module global
+@Global()
 @Module({
   imports: [
     MailerModule.forRootAsync({
-      // imports: [ConfigModule], // import module if not enabled globally
-      useFactory: async (config: ConfigService) => ({
-        // transport: config.get("MAIL_TRANSPORT"),
-        // or
-        transport: {
-          host: config.get('MAIL_HOST'),
-          secure: false,
-          auth: {
-            user: config.get('MAIL_USER'),
-            pass: config.get('MAIL_PASSWORD'),
+      imports: [ConfigModule],
+      useFactory: async (config: ConfigService) => {
+        const templatePath = join(process.cwd(), 'src/mail/templates');
+
+        return {
+          transport: {
+            host: config.get('MAIL_HOST'),
+            port: 465,
+            secure: true,
+            auth: {
+              user: config.get('MAIL_USER'),
+              pass: config.get('MAIL_PASSWORD'),
+            },
           },
-        },
-        defaults: {
-          from: `"No Reply" <${config.get('MAIL_FROM')}>`,
-        },
-        template: {
-          dir: join(__dirname, 'templates'),
-          adapter: new HandlebarsAdapter(),
-          options: {
-            strict: true,
+          defaults: {
+            from: `"${config.get('MAIL_FROM_NAME')}" <${config.get('MAIL_USER')}>`,
           },
-        },
-      }),
+          template: {
+            dir: templatePath,
+            adapter: new HandlebarsAdapter(),
+            options: {
+              strict: true,
+            },
+          },
+          preview: false, // Disable preview to prevent local file opening
+        };
+      },
       inject: [ConfigService],
     }),
   ],

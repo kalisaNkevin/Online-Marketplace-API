@@ -1,31 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { MailService } from './mail.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
-import { MailService } from './mail.service';
 
 describe('MailService', () => {
   let mailService: MailService;
   let mailerService: MailerService;
-  let configService: ConfigService;
-
-  const mockMailerService = {
-    sendMail: jest.fn().mockResolvedValue(true),
-  };
-
-  const mockConfigService = {
-    get: jest.fn((key: string) => {
-      switch (key) {
-        case 'APP_URL':
-          return 'example.com';
-        case 'MAIL_FROM':
-          return 'noreply@jabocollection.com';
-        case 'MAIL_FROM_NAME':
-          return 'Nice App';
-        default:
-          return undefined;
-      }
-    }),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -33,65 +13,58 @@ describe('MailService', () => {
         MailService,
         {
           provide: MailerService,
-          useValue: mockMailerService,
+          useValue: {
+            sendMail: jest.fn(),
+          },
         },
         {
           provide: ConfigService,
-          useValue: mockConfigService,
+          useValue: {
+            get: jest.fn().mockImplementation((key: string) => {
+              if (key === 'APP_URL') return 'http://localhost:3000';
+              return 'mock-value';
+            }),
+          },
         },
       ],
     }).compile();
 
     mailService = module.get<MailService>(MailService);
     mailerService = module.get<MailerService>(MailerService);
-    configService = module.get<ConfigService>(ConfigService);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('should be defined', () => {
-    expect(mailService).toBeDefined();
-    expect(mailerService).toBeDefined();
-    expect(configService).toBeDefined();
   });
 
   describe('sendUserConfirmation', () => {
-    it('should send confirmation email', async () => {
+    it('should send welcome email successfully', async () => {
       const user = {
-        id: '1',
         email: 'test@example.com',
         name: 'Test User',
-        role: 'USER',
-        password: 'hashedPassword',
-        phoneNumber: '',
-        address: '',
-        city: '',
-        country: '',
-        postalCode: '',
-        avatar: '',
-        dateOfBirth: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isVerified: false,
-        verificationToken: null,
-        passwordResetToken: null,
-        passwordResetExpires: null,
       };
-      const token = 'test-verification-token';
+      const token = 'verification-token';
 
       await mailService.sendUserConfirmation(user as any, token);
 
-      expect(mockMailerService.sendMail).toHaveBeenCalledWith({
+      expect(mailerService.sendMail).toHaveBeenCalledWith({
         to: user.email,
-        subject: 'Welcome to Nice App! Confirm your Email',
-        template: './transactional',
+        subject: 'Welcome to Jabo Collection! Confirm your Email',
+        template: './confirmation',
         context: {
           name: user.name,
-          url: `example.com/auth/confirm?token=${token}`,
+          url: `http://localhost:3000/auth/verify-email?token=${token}`,
         },
       });
+    });
+
+    it('should handle mailer errors', async () => {
+      const user = {
+        email: 'test@example.com',
+        name: 'Test User',
+      };
+
+      jest.spyOn(mailerService, 'sendMail').mockRejectedValue(new Error('Failed to send confirmation email'));
+
+      await expect(
+        mailService.sendUserConfirmation(user as any, 'token'),
+      ).rejects.toThrow('Failed to send confirmation email');
     });
   });
 });

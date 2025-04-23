@@ -1,0 +1,171 @@
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <meta http-equiv='x-ua-compatible' content='ie=edge' />
+    <meta name='x-apple-disable-message-reformatting' />
+    <meta
+      name='format-detection'
+      content='telephone=no, date=no, address=no, email=no'
+    />
+    <!--[if mso]>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+    <![endif]-->
+    <title style='display: none'>Welcome to Jabo Collection</title>
+    <style>
+      /* Reset styles for email clients */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        background-color: #f4f4f4;
+        color: #333333;
+        margin: 0;
+        padding: 20px;
+      }
+
+      .email-wrapper {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .header {
+        background-color: #264219;
+        padding: 30px;
+        text-align: center;
+        border-radius: 8px 8px 0 0;
+      }
+
+      .header img {
+        max-width: 150px;
+        height: auto;
+      }
+
+      .content {
+        padding: 40px 30px;
+      }
+
+      h1 {
+        color: #1f2937;
+        font-size: 24px;
+        margin-bottom: 20px;
+      }
+
+      p {
+        margin-bottom: 20px;
+        color: #4b5563;
+        font-size: 16px;
+      }
+
+      .button-container {
+        text-align: center;
+        margin: 30px 0;
+      }
+
+      .button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #264219;
+        color: #ffffff !important;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 16px;
+        border: 2px solid #264219;
+      }
+
+      .footer {
+        background-color: #f8fafc;
+        padding: 30px;
+        text-align: center;
+        border-radius: 0 0 8px 8px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .social-links {
+        margin-top: 20px;
+      }
+
+      .social-links a {
+        color: #264219;
+        text-decoration: none;
+        margin: 0 10px;
+        font-weight: 500;
+      }
+
+      /* Media Queries for responsiveness */
+      @media only screen and (max-width: 600px) {
+        body {
+          padding: 10px;
+        }
+
+        .content {
+          padding: 20px;
+        }
+
+        h1 {
+          font-size: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class='email-wrapper'>
+      <div class='header'>
+        <img
+          src='https://res.cloudinary.com/kevin250/image/upload/v1745413002/1_y6tw7b.svg'
+          alt='Jabo Collection'
+          style='display: block; width: 150px; height: auto; margin: 0 auto;'
+          width='150'
+          height='auto'
+        />
+      </div>
+
+      <div class='content'>
+        <h1>Welcome to Jabo Collection, {{name}}!</h1>
+
+        <p>Thank you for joining our community. We're excited to have you on
+          board! To start exploring our marketplace, please verify your email
+          address.</p>
+
+        <div class='button-container'>
+          <a
+            href='{{url}}'
+            class='button'
+            style='background-color: #264219; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block;'
+          >
+            Verify Email Address →
+          </a>
+        </div>
+
+        <p style='font-size: 14px; color: #6b7280;'>
+          If you didn't create an account with Jabo Collection, you can safely
+          ignore this email.
+        </p>
+      </div>
+
+      <div class='footer'>
+        <p style='color: #6b7280;'>© 2025 Jabo Collection. All rights reserved.</p>
+        <div class='social-links'>
+          <a href='https://facebook.com/jabocollection'>Facebook</a>
+          •
+          <a href='https://instagram.com/jabocollection'>Instagram</a>
+          •
+          <a href='https://twitter.com/jabocollection'>Twitter</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
