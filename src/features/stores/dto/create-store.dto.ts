@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
 
 export class CreateStoreDto {
   @ApiProperty({
@@ -7,6 +7,7 @@ export class CreateStoreDto {
     description: 'Store name',
   })
   @IsString()
+  @IsNotEmpty()
   name: string;
 
   @ApiProperty({
@@ -17,4 +18,13 @@ export class CreateStoreDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiProperty({
+    example: 'https://example.com/logo.png',
+    description: 'Store logo URL',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  logoUrl?: string;
 }

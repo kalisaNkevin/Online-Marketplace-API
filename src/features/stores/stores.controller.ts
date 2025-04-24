@@ -9,6 +9,8 @@ import {
   UseGuards,
   Request,
   ForbiddenException,
+  UnauthorizedException,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,8 +23,12 @@ import { StoresService } from './stores.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guards';
-import { Role } from '@prisma/client';
+import { Role, Store } from '@prisma/client';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { StoreResponseDto } from './dto/store-response.dto';
+
 
 @ApiTags('Stores')
 @Controller('stores')
@@ -31,18 +37,25 @@ export class StoresController {
   constructor(private readonly storesService: StoresService) {}
 
   @Post()
+  @Roles([Role.SELLER])
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Create a new store (Sellers only)' })
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Create a new store' })
   @ApiResponse({
-    status: 201,
+    status: HttpStatus.CREATED,
     description: 'Store has been successfully created',
+    type: CreateStoreDto,
   })
-  @ApiResponse({ status: 403, description: 'Forbidden - Sellers only' })
-  async create(@Request() req, @Body() createStoreDto: CreateStoreDto) {
-    if (req.user.role !== Role.SELLER) {
-      throw new ForbiddenException('Only sellers can create stores');
+  async create(
+    @Request() req,
+    @Body() createStoreDto: CreateStoreDto,
+  ): Promise<Store> {
+    // Explicitly get userId from the authenticated user
+    const userId = req.user.id;
+    if (!userId) {
+      throw new UnauthorizedException('User not authenticated');
     }
-    return await this.storesService.create(req.user.sub, createStoreDto);
+    return this.storesService.create(userId, createStoreDto);
   }
 
   @Get()
@@ -62,19 +75,21 @@ export class StoresController {
   }
 
   @Get('my-store')
+  @Roles([Role.SELLER])
+  @UseGuards(RolesGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: "Get current user's store (Private)" })
+  @ApiOperation({ summary: "Get seller's own store" })
   @ApiResponse({
     status: 200,
-    description: 'Returns the stores owned by the current user',
+    description: 'Returns the store owned by the current seller',
+    type: StoreResponseDto
   })
-  async findMyStore(@Request() req) {
-    return await this.storesService.findByUser(req.user.sub, {
-      page: 1,
-      limit: 10,
-      sortBy: 'createdAt',
-      sortOrder: 'desc',
-    });
+  @ApiResponse({
+    status: 404,
+    description: 'Store not found for this seller'
+  })
+  async findMyStore(@Request() req): Promise<StoreResponseDto> {
+    return this.storesService.findByOwnerId(req.user.id);
   }
 
   @Get(':id')

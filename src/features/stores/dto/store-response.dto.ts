@@ -29,24 +29,38 @@ export class StoreMetricsDto {
 }
 
 export class StoreResponseDto {
+  @ApiProperty()
   id: string;
+
+  @ApiProperty()
   name: string;
-  description: string;
-  ownerId: string;
+
+  @ApiProperty({ required: false })
+  description?: string;
+
+  @ApiProperty({ required: false })
+  logoUrl?: string;
+
+  @ApiProperty()
   owner: {
+    id: string;
     name: string;
     email: string;
   };
-  products: {
+
+  @ApiProperty({ type: [Object] })
+  products: Array<{
     id: string;
     name: string;
-    price: Decimal;
-  }[];
-  metrics: {
-    totalProducts: number;
-    averageProductRating: number;
-  };
+    price: number;
+    averageRating?: number;
+  }>;
+
+
+  @ApiProperty()
   createdAt: Date;
+
+  @ApiProperty()
   updatedAt: Date;
 }
 

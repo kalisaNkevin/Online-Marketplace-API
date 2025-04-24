@@ -112,14 +112,14 @@ model Store {
   id          String    @id @default(uuid())
   name        String
   description String?
+  logoUrl     String?   // Add this field
   ownerId     String
   owner       User      @relation(fields: [ownerId], references: [id])
-  products    Product[] // Add this line to complete the relation
+  products    Product[]
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime  @default(now())
 
-  @@index([ownerId])
-  @@index([name])
+  @@map("stores")
 }
 
 model Product {

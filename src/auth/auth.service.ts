@@ -102,49 +102,6 @@ export class AuthService {
       throw new UnauthorizedException('Please verify your email first');
     }
 
-    // For sellers, check if they have an associated store
-    if (user.role === 'SELLER') {
-      const store = await this.prisma.store.findFirst({
-        where: { ownerId: user.id },
-      });
-
-      if (!store) {
-        throw new ForbiddenException(
-          'Seller must create a store before creating products',
-        );
-      }
-
-      // Include store information in the payload
-      const payload = {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        storeId: store.id, // Add store ID to payload
-      };
-
-      const [accessToken, refreshToken] = await Promise.all([
-        this.jwtService.signAsync(payload, {
-          secret: this.configService.get('JWT_SECRET'),
-          expiresIn: '1h',
-        }),
-        this.jwtService.signAsync(
-          { sub: user.id, storeId: store.id }, // Include storeId in refresh token
-          {
-            secret: this.configService.get('JWT_REFRESH_SECRET'),
-            expiresIn: '7d',
-          },
-        ),
-      ]);
-
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { refreshToken },
-      });
-
-      return { token: accessToken, refreshToken };
-    }
-
-    // For non-sellers, continue with regular payload
     const payload = {
       sub: user.id,
       email: user.email,

@@ -7,7 +7,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { QueryStoreDto } from './dto/query-store.dto';
-import { Prisma, Store } from '@prisma/client';
+import { Prisma, Role, Store } from '@prisma/client';
 import { StoreResponseDto } from './dto/store-response.dto';
 
 export interface PaginatedResponse<T> {
@@ -48,18 +48,6 @@ export class StoresService {
     };
   }
 
-  private calculateStoreMetrics(store: any): StoreMetrics {
-    return {
-      totalProducts: store._count.products,
-      averageProductRating:
-        store.products.reduce(
-          (acc: number, product: any) =>
-            acc + (product.averageRating?.toNumber() || 0),
-          0,
-        ) / store.products.length || 0,
-    };
-  }
-
   private async validateStoreOwnership(
     storeId: string,
     userId: string,
@@ -74,11 +62,42 @@ export class StoresService {
   }
 
   async create(userId: string, createStoreDto: CreateStoreDto): Promise<Store> {
+    // First verify the user exists and is a seller
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true }
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    if (user.role !== Role.SELLER) {
+      throw new ForbiddenException('Only sellers can create stores');
+    }
+
+    const { name, description, logoUrl } = createStoreDto;
+
     return await this.prisma.store.create({
       data: {
-        ...createStoreDto,
-        ownerId: userId,
+        name,
+        description,
+        ...(logoUrl && { logoUrl }),
+        owner: {
+          connect: {
+            id: user.id // Use verified user.id
+          }
+        }
       },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
     });
   }
 
@@ -106,6 +125,7 @@ export class StoresService {
           updatedAt: true,
           owner: {
             select: {
+              id: true,
               name: true,
               email: true,
             },
@@ -118,9 +138,7 @@ export class StoresService {
               averageRating: true,
             },
           },
-          _count: {
-            select: { products: true },
-          },
+
         },
       }),
       this.prisma.store.count(),
@@ -129,14 +147,11 @@ export class StoresService {
     // Transform the data to match StoreResponseDto
     const transformedStores = stores.map((store) => ({
       ...store,
-      metrics: {
-        totalProducts: store._count.products,
-        averageProductRating:
-          store.products.reduce(
-            (acc, product) => acc + (product.averageRating?.toNumber() || 0),
-            0,
-          ) / store.products.length || 0,
-      },
+      products: store.products.map((product) => ({
+        ...product,
+        price: product.price.toNumber(),
+        averageRating: product.averageRating?.toNumber(),
+      })),
     }));
 
     return {
@@ -161,9 +176,6 @@ export class StoresService {
           },
         },
         products: true,
-        _count: {
-          select: { products: true },
-        },
       },
     });
 
@@ -194,51 +206,65 @@ export class StoresService {
     return { message: 'Store deleted successfully' };
   }
 
-  async findByUser(
-    userId: string,
-    query: QueryStoreDto,
-  ): Promise<PaginatedResponse<Store>> {
-    const {
-      search,
-      page = 1,
-      limit = 10,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-    } = query;
-
-    const where = this.buildWhereClause(search, userId);
-    const skip = (page - 1) * limit;
-
-    const [stores, total] = await Promise.all([
-      this.prisma.store.findMany({
-        where,
-        orderBy: { [sortBy]: sortOrder },
-        skip,
-        take: limit,
-        include: {
-          products: {
-            select: {
-              id: true,
-              name: true,
-              price: true,
-            },
-          },
-          _count: {
-            select: { products: true },
+  async findByOwnerId(userId: string): Promise<StoreResponseDto> {
+    // Find store where ownerId matches the authenticated user's ID
+    const store = await this.prisma.store.findFirst({
+      where: {
+        ownerId: userId
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
-      }),
-      this.prisma.store.count({ where }),
-    ]);
+        products: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            averageRating: true,
+            thumbnail: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        },
+        _count: {
+          select: {
+            products: true
+          }
+        }
+      }
+    });
 
+    if (!store) {
+      throw new NotFoundException(`No store found for user ID: ${userId}`);
+    }
+
+    // Transform the response to match StoreResponseDto format
     return {
-      data: stores,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+      id: store.id,
+      name: store.name,
+      description: store.description,
+      logoUrl: store.logoUrl,
+      createdAt: store.createdAt,
+      updatedAt: store.updatedAt,
+      owner: {
+        id: store.owner.id,
+        name: store.owner.name,
+        email: store.owner.email,
       },
+      products: store.products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price.toNumber(),
+        averageRating: product.averageRating?.toNumber(),
+        thumbnail: product.thumbnail,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+      })),
     };
   }
 }

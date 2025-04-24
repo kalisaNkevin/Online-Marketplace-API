@@ -13,6 +13,7 @@ import {
   HttpStatus,
   HttpCode,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -41,12 +42,16 @@ import { ProductEntity } from './entities/product.entity';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { ReviewEntity } from './entities/review.entity';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { PrismaService } from '@/database/prisma.service';
 
 @ApiTags('Products')
 @Controller('products')
 @UseGuards(JwtAuthGuard)
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post()
   @UseGuards(RolesGuard)
@@ -68,11 +73,31 @@ export class ProductsController {
     @Request() req,
     @Body() createProductDto: CreateProductDto,
   ): Promise<ProductResponseDto> {
-    // Verify storeId exists in request
-    if (!req.user?.storeId) {
+    // First find the seller's store
+    const store = await this.prisma.store.findFirst({
+      where: { ownerId: req.user.id },
+    });
+
+    if (!store) {
       throw new ForbiddenException('Seller must have an associated store');
     }
-    return this.productsService.create(req.user.storeId, createProductDto);
+
+    // Validate that all categories exist
+    if (createProductDto.categories?.length) {
+      const categories = await this.prisma.category.findMany({
+        where: {
+          id: {
+            in: createProductDto.categories,
+          },
+        },
+      });
+
+      if (categories.length !== createProductDto.categories.length) {
+        throw new BadRequestException('One or more categories do not exist');
+      }
+    }
+
+    return this.productsService.create(store.id, createProductDto);
   }
 
   // Public endpoint - anyone can access

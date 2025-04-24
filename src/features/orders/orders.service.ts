@@ -50,9 +50,7 @@ const orderInclude = {
 
 @Injectable()
 export class OrdersService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async createOrder(
     userId: string,
@@ -187,12 +185,24 @@ export class OrdersService {
     query: QueryOrderDto,
   ): Promise<PaginatedOrdersResponse> {
     const { page = 1, limit = 10, status } = query;
+    const skip = (page - 1) * limit;
 
-    const where: Prisma.OrderWhereInput = {
+    // First verify the store exists
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId },
+      select: { id: true },
+    });
+
+    if (!store) {
+      throw new NotFoundException(`Store with ID ${storeId} not found`);
+    }
+
+    // Then get orders for this store
+    const where = {
       items: {
         some: {
           product: {
-            storeId,
+            storeId: store.id,
           },
         },
       },
@@ -202,10 +212,36 @@ export class OrdersService {
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
-        skip: (page - 1) * limit,
+        include: {
+          ...orderInclude,
+          items: {
+            where: {
+              product: {
+                storeId: store.id,
+              },
+            },
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  store: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        skip,
         take: limit,
-        include: orderInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy: {
+          createdAt: 'desc',
+        },
       }),
       this.prisma.order.count({ where }),
     ]);

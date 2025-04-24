@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   HttpStatus,
   HttpCode,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -80,7 +81,7 @@ export class OrdersController {
   @Roles([Role.SELLER])
   @UseGuards(RolesGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get seller store orders' })
+  @ApiOperation({ summary: "Get orders for seller's store" })
   @ApiQuery({ type: QueryOrderDto })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -91,7 +92,32 @@ export class OrdersController {
     @Request() req,
     @Query() query: QueryOrderDto,
   ): Promise<PaginatedOrdersResponse> {
-    return this.ordersService.getStoreOrders(req.user.storeId, query);
+    // Get storeId from authenticated seller's JWT token
+    const storeId = req.user.storeId;
+    if (!storeId) {
+      throw new UnauthorizedException('Seller must have an associated store');
+    }
+    return this.ordersService.getStoreOrders(storeId, query);
+  }
+
+  // Add separate endpoint for admin to view any store's orders
+  @Get('admin/store-orders')
+  @Roles([Role.ADMIN])
+  @UseGuards(RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get orders for any store (Admin only)' })
+  @ApiQuery({ name: 'storeId', required: true, type: String })
+  @ApiQuery({ type: QueryOrderDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Returns paginated list of store orders',
+    type: PaginatedOrdersResponse,
+  })
+  async getStoreOrdersAdmin(
+    @Query('storeId') storeId: string,
+    @Query() query: QueryOrderDto,
+  ): Promise<PaginatedOrdersResponse> {
+    return this.ordersService.getStoreOrders(storeId, query);
   }
 
   @Get('admin/all')

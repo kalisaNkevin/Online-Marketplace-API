@@ -120,7 +120,7 @@ export class AuthController {
       statusCode: 200,
       message: 'Login successful',
       data: {
-        accessToken: result.token, // Rename token to accessToken
+        accessToken: result.token,
         refreshToken: result.refreshToken,
       },
     };

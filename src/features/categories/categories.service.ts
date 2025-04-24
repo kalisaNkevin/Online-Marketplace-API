@@ -33,7 +33,6 @@ export class CategoriesService {
     try {
       const category = await this.prisma.category.create({
         data: createCategoryDto,
-        include: this.defaultInclude,
       });
 
       this.logger.log(`Category created: ${category.id} - ${category.name}`);

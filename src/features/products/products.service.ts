@@ -14,9 +14,7 @@ import { UpdateReviewDto } from './dto/update-review.dto';
 
 @Injectable()
 export class ProductsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly productInclude = {
     store: {
@@ -25,10 +23,14 @@ export class ProductsService {
         name: true,
       },
     },
-    categories: true,
+    categories: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
     variants: true,
     Review: {
-      // Changed from 'reviews' to 'Review'
       include: {
         user: {
           select: {
@@ -99,32 +101,56 @@ export class ProductsService {
   }
 
   async create(
-    sellerId: string,
+    storeId: string,
     createProductDto: CreateProductDto,
   ): Promise<ProductResponseDto> {
-    const { categories, variants, ...data } = createProductDto;
+    const { categories, variants, ...productData } = createProductDto;
 
+    // Create product with proper relations
     const product = await this.prisma.product.create({
       data: {
-        ...data,
-        store: { connect: { id: sellerId } },
+        ...productData,
+        store: {
+          connect: { id: storeId },
+        },
         categories: {
-          connect: categories?.map((id) => ({ id })),
+          connect: categories?.map((id) => ({ id })) || [],
         },
         variants: {
-          createMany: {
-            data: variants || [],
-          },
+          create:
+            variants?.map((variant) => ({
+              size: variant.size,
+              quantity: variant.quantity,
+            })) || [],
         },
       },
       include: {
-        store: true,
-        categories: true,
+        store: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        categories: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         variants: true,
+        Review: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    //await this.redisService.del('featured_products');
     return this.transformProductResponse(product);
   }
 
@@ -259,56 +285,52 @@ export class ProductsService {
 
   async update(
     id: string,
-    sellerId: string,
+    storeId: string,
     updateProductDto: UpdateProductDto,
   ): Promise<ProductResponseDto> {
-    const product = await this.prisma.product.findFirst({
-      where: { id, store: { ownerId: sellerId } },
+    // First verify the product exists and belongs to the store
+    const existingProduct = await this.prisma.product.findFirst({
+      where: {
+        id,
+        storeId,
+      },
     });
 
-    if (!product) {
-      throw new NotFoundException('Product not found or unauthorized');
+    if (!existingProduct) {
+      throw new NotFoundException(
+        'Product not found or does not belong to your store',
+      );
     }
 
-    const updated = await this.prisma.product.update({
+    const { categories, variants, ...productData } = updateProductDto;
+
+    // Use unchecked update for better type safety
+    const updatedProduct = await this.prisma.product.update({
       where: { id },
       data: {
-        ...updateProductDto,
-        categories: updateProductDto.categories
+        ...productData,
+        categories: categories
           ? {
-              set: updateProductDto.categories.map((id) => ({ id })),
+              set: categories.map((id) => ({ id })),
             }
           : undefined,
-        variants: updateProductDto.variants
+        variants: variants
           ? {
-              upsert: updateProductDto.variants.map((variant) => ({
-                where: {
-                  productId_size: { productId: id, size: variant.size },
-                },
-                update: {
+              deleteMany: {}, // First delete existing variants
+              createMany: {
+                // Then create new ones
+                data: variants.map((variant) => ({
                   size: variant.size,
                   quantity: variant.quantity,
-                },
-                create: {
-                  size: variant.size,
-                  quantity: variant.quantity,
-                },
-              })),
+                })),
+              },
             }
           : undefined,
       },
-      include: {
-        store: true,
-        categories: true,
-        variants: true,
-      },
+      include: this.productInclude,
     });
 
-    // if (updated.isFeatured) {
-    //   await this.redisService.del('featured_products');
-    // }
-
-    return this.transformProductResponse(updated);
+    return this.transformProductResponse(updatedProduct);
   }
 
   async remove(id: string, storeId: string): Promise<{ message: string }> {
