@@ -10,7 +10,6 @@ import { Decimal } from '@prisma/client/runtime/library';
 describe('ProductsService', () => {
   let service: ProductsService;
 
-
   const mockProduct = {
     id: '1',
     name: 'Test Product',
@@ -70,7 +69,6 @@ describe('ProductsService', () => {
     $transaction: jest.fn((callback) => callback(mockPrismaService)),
   };
 
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -83,7 +81,6 @@ describe('ProductsService', () => {
     }).compile();
 
     service = module.get<ProductsService>(ProductsService);
-
 
     jest.clearAllMocks();
   });
@@ -110,7 +107,6 @@ describe('ProductsService', () => {
 
       expect(result).toBeDefined();
       expect(mockPrismaService.product.create).toHaveBeenCalled();
-    
     });
   });
 
@@ -149,40 +145,43 @@ describe('ProductsService', () => {
   });
 
   describe('getFeaturedProducts', () => {
-    const cachedProducts = [{
-      id: '1',
-      name: 'Test Product',
-      description: 'Test Description',
-      price: 100,
-      quantity: 10,
-      isActive: true,
-      isFeatured: true,
-      discount: null,
-      thumbnail: null,
-      images: [],
-      storeId: '1',
-      store: {
+    const cachedProducts = [
+      {
         id: '1',
-        name: 'Test Store',
-        ownerId: '1'  // Add missing ownerId
+        name: 'Test Product',
+        description: 'Test Description',
+        price: 100,
+        quantity: 10,
+        isActive: true,
+        isFeatured: true,
+        discount: null,
+        thumbnail: null,
+        images: [],
+        storeId: '1',
+        store: {
+          id: '1',
+          name: 'Test Store',
+          ownerId: '1', // Add missing ownerId
+        },
+        categories: [],
+        variants: [
+          {
+            id: '1', // Add missing id
+            productId: '1', // Add missing productId
+            size: 'M',
+            quantity: 5,
+          },
+        ],
+        reviews: [],
+        _count: {
+          // Add missing review count
+          reviews: 0,
+        },
+        averageRating: 0, // Fix averageRating to be 0 instead of null
+        createdAt: new Date('2025-04-21T10:55:59.252Z').toISOString(), // Format date as ISO string
+        updatedAt: new Date('2025-04-21T10:55:59.252Z').toISOString(), // Format date as ISO string
       },
-      categories: [],
-      variants: [
-        {
-          id: '1',           // Add missing id
-          productId: '1',    // Add missing productId
-          size: 'M',
-          quantity: 5
-        }
-      ],
-      reviews: [],
-      _count: {            // Add missing review count
-        reviews: 0
-      },
-      averageRating: 0,    // Fix averageRating to be 0 instead of null
-      createdAt: new Date('2025-04-21T10:55:59.252Z').toISOString(), // Format date as ISO string
-      updatedAt: new Date('2025-04-21T10:55:59.252Z').toISOString()  // Format date as ISO string
-    }];
+    ];
 
     const mockFeaturedProduct = {
       id: '1',
@@ -198,44 +197,36 @@ describe('ProductsService', () => {
       storeId: '1',
       store: {
         id: '1',
-        name: 'Test Store'
+        name: 'Test Store',
       },
       categories: [],
       variants: [
         {
           quantity: 5,
-          size: 'M'
-        }
+          size: 'M',
+        },
       ],
       reviews: [],
       averageRating: null,
       createdAt: new Date('2025-04-21T10:59:35.399Z'),
-      updatedAt: new Date('2025-04-21T10:59:35.399Z')
+      updatedAt: new Date('2025-04-21T10:59:35.399Z'),
     };
 
-
     it('should return featured products from database if not cached', async () => {
-  
       mockPrismaService.product.findMany.mockResolvedValue([mockProduct]);
 
       const result = await service.getFeaturedProducts();
 
       expect(result).toBeDefined();
-
     });
 
     it('should cache database results for 1 hour', async () => {
-
       mockPrismaService.product.findMany.mockResolvedValue([mockProduct]);
 
       await service.getFeaturedProducts();
-
-
     });
 
     it('should return only active and featured products from database', async () => {
-    
-
       await service.getFeaturedProducts();
 
       expect(mockPrismaService.product.findMany).toHaveBeenCalledWith(
@@ -249,8 +240,6 @@ describe('ProductsService', () => {
     });
 
     it('should limit database results to 12 products', async () => {
-
-
       await service.getFeaturedProducts();
 
       expect(mockPrismaService.product.findMany).toHaveBeenCalledWith(

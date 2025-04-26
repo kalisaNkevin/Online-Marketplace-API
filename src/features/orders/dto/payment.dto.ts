@@ -6,7 +6,7 @@ export class PaymentDto {
   @ApiProperty({
     enum: PaymentMethod,
     example: PaymentMethod.MOMO_MTN,
-    description: 'Payment method'
+    description: 'Payment method',
   })
   @IsEnum(PaymentMethod)
   method: PaymentMethod;
@@ -14,9 +14,13 @@ export class PaymentDto {
   @ApiProperty({
     example: '+250780123456',
     description: 'Mobile money number',
-    required: false
+    required: false,
   })
-  @ValidateIf(o => o.method === PaymentMethod.MOMO_MTN || o.method === PaymentMethod.MOMO_AIRTEL)
+  @ValidateIf(
+    (o) =>
+      o.method === PaymentMethod.MOMO_MTN ||
+      o.method === PaymentMethod.MOMO_AIRTEL,
+  )
   @IsString()
   phoneNumber?: string;
 }

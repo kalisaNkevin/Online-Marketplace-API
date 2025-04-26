@@ -11,7 +11,6 @@ import { JwtAuthGuard } from './guards/jwt-auth.guards';
 import { MailService } from '@/mail/mail.service';
 import { MailModule } from '@/mail/mail.module';
 
-
 @Global()
 @Module({
   imports: [

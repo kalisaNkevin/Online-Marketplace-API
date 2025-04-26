@@ -221,7 +221,7 @@ describe('AuthService', () => {
         loginDto.password,
         user.password,
       );
-    }); 
+    });
 
     it('should throw UnauthorizedException if email is not verified', async () => {
       const hashedPassword = await bcrypt.hash(loginDto.password, 10);

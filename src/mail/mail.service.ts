@@ -26,7 +26,10 @@ export class MailService {
         },
       });
     } catch (error) {
-      this.logger.error(`Failed to send confirmation email to ${user.email}`, error);
+      this.logger.error(
+        `Failed to send confirmation email to ${user.email}`,
+        error,
+      );
       throw new Error('Failed to send confirmation email');
     }
   }

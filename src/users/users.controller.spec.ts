@@ -72,7 +72,7 @@ describe('UsersController', () => {
       it('should throw NotFoundException for invalid user', async () => {
         mockUsersService.findById.mockRejectedValue(new NotFoundException());
         await expect(
-          controller.getProfile({ user: { id: '999' } })
+          controller.getProfile({ user: { id: '999' } }),
         ).rejects.toThrow(NotFoundException);
       });
     });
@@ -81,19 +81,24 @@ describe('UsersController', () => {
       it('should update profile successfully', async () => {
         const updatedUser = { ...mockUserData, ...mockUpdateProfileDto };
         mockUsersService.updateProfile.mockResolvedValue(updatedUser);
-        
+
         const result = await controller.updateProfile(
           { user: { sub: '1' } },
-          mockUpdateProfileDto
+          mockUpdateProfileDto,
         );
-        
+
         expect(result).toEqual(updatedUser);
       });
 
       it('should handle update failures', async () => {
-        mockUsersService.updateProfile.mockRejectedValue(new NotFoundException());
+        mockUsersService.updateProfile.mockRejectedValue(
+          new NotFoundException(),
+        );
         await expect(
-          controller.updateProfile({ user: { sub: '999' } }, mockUpdateProfileDto)
+          controller.updateProfile(
+            { user: { sub: '999' } },
+            mockUpdateProfileDto,
+          ),
         ).rejects.toThrow(NotFoundException);
       });
     });
@@ -104,14 +109,14 @@ describe('UsersController', () => {
       it('should allow admin access', async () => {
         const users = [mockUserData, { ...mockUserData, id: '2' }];
         mockUsersService.findAll.mockResolvedValue(users);
-        
+
         const result = await controller.getAllUsers(mockAdminRequest);
         expect(result).toEqual(users);
       });
 
       it('should forbid non-admin access', async () => {
         await expect(
-          controller.getAllUsers(mockShopperRequest)
+          controller.getAllUsers(mockShopperRequest),
         ).rejects.toThrow(ForbiddenException);
         expect(mockUsersService.findAll).not.toHaveBeenCalled();
       });
@@ -121,14 +126,14 @@ describe('UsersController', () => {
       it('should allow admin to deactivate users', async () => {
         const deactivatedUser = { ...mockUserData, isActive: false };
         mockUsersService.deactivateUser.mockResolvedValue(deactivatedUser);
-        
+
         const result = await controller.deactivateUser('2', mockAdminRequest);
         expect(result).toEqual(deactivatedUser);
       });
 
       it('should prevent non-admin deactivation', async () => {
         await expect(
-          controller.deactivateUser('1', mockShopperRequest)
+          controller.deactivateUser('1', mockShopperRequest),
         ).rejects.toThrow(ForbiddenException);
       });
     });
@@ -136,30 +141,30 @@ describe('UsersController', () => {
     describe('deleteUser', () => {
       it('should allow admin to delete other users', async () => {
         mockUsersService.deleteUser.mockResolvedValue(mockUserData);
-        
+
         const result = await controller.deleteUser('2', mockAdminRequest);
         expect(result).toEqual(mockUserData);
       });
 
       it('should prevent self-deletion', async () => {
-        const adminUserRequest = { 
-          user: { 
-            id: '1',    // Same ID as the one being deleted
-            role: Role.ADMIN 
-          } 
+        const adminUserRequest = {
+          user: {
+            id: '1', // Same ID as the one being deleted
+            role: Role.ADMIN,
+          },
         };
-        
+
         await expect(
-          controller.deleteUser('1', adminUserRequest)
+          controller.deleteUser('1', adminUserRequest),
         ).rejects.toThrow(ForbiddenException);
-        
+
         expect(mockUsersService.deleteUser).not.toHaveBeenCalled();
       });
 
       it('should handle non-existent users', async () => {
         mockUsersService.deleteUser.mockRejectedValue(new NotFoundException());
         await expect(
-          controller.deleteUser('999', mockAdminRequest)
+          controller.deleteUser('999', mockAdminRequest),
         ).rejects.toThrow(NotFoundException);
       });
     });

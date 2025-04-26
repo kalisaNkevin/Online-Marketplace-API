@@ -6,7 +6,6 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "prebuild": "rimraf dist",
     "build": "nest build && npm run copy:templates",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -44,11 +43,10 @@
     "docker:db:reset": "docker-compose exec api npx prisma migrate reset --force",
     "docker:logs": "docker-compose logs -f",
     "docker:shell": "docker-compose exec api sh",
-    "copy:templates": "mkdir -p dist/mail/templates && cp -r src/mail/templates/* dist/mail/templates/",
-    "postbuild": "npm audit fix"
+    "copy:templates": "mkdir -p dist/mail/templates && cp -r src/mail/templates/* dist/mail/templates/"
   },
   "dependencies": {
-    "@nestjs-modules/mailer": "^1.9.1",
+    "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/bull": "^11.0.2",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^11.0.14",
@@ -71,7 +69,7 @@
     "cache-manager": "^6.4.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
-    "cloudinary": "^1.41.3",
+    "cloudinary": "^2.6.0",
     "cookie-parser": "^1.4.7",
     "express-rate-limit": "^7.5.0",
     "express-session": "^1.18.1",
@@ -127,7 +125,8 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "resolutions": {
-    "html-minifier": "4.0.0"
+    "html-minifier": "4.0.0",
+    "cloudinary": "^2.6.0"
   },
   "overrides": {
     "@nestjs-modules/mailer": {

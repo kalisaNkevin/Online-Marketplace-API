@@ -47,7 +47,10 @@ export class AuthService {
         },
       });
 
-      await this.mailerSendService.sendUserConfirmation(user, verificationToken);
+      await this.mailerSendService.sendUserConfirmation(
+        user,
+        verificationToken,
+      );
 
       return {
         message:

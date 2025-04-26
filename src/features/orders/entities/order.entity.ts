@@ -89,7 +89,7 @@ export class OrderEntity {
     type: 'object',
     additionalProperties: true,
   })
-  shippingAddress: any; 
+  shippingAddress: any;
 
   @ApiProperty()
   createdAt: Date;

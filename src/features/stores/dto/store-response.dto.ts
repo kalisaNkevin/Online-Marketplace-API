@@ -9,7 +9,7 @@ export class StoreProductDto {
   name: string;
 
   @ApiProperty({ example: 90 })
-  price: number ;
+  price: number;
 
   @ApiProperty({ example: 90 })
   averageRating?: number;

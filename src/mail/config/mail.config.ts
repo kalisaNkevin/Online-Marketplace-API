@@ -8,5 +8,5 @@ export const getMailConfig = (config: ConfigService): MailConfig => ({
   user: config.get<string>('MAIL_USER'),
   password: config.get<string>('MAIL_PASSWORD'),
   from: config.get<string>('MAIL_FROM'),
-  fromName: config.get<string>('MAIL_FROM_NAME', 'Jabo Collection')
+  fromName: config.get<string>('MAIL_FROM_NAME', 'Jabo Collection'),
 });
