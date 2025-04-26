@@ -49,6 +49,8 @@ async function bootstrap() {
             `'self'`,
             'https://*.jabocollection.com',
             'wss://*.jabocollection.com',
+            'http://localhost:3000',
+            'http://localhost:5173',
           ],
           fontSrc: [
             `'self'`,
@@ -70,10 +72,20 @@ async function bootstrap() {
       'https://www.jabocollection.com',
       'https://jabocollection.com',
       /\.jabocollection\.com$/,
+      'http://localhost:3000',
+      'http://localhost:5173',
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+    ],
+    exposedHeaders: ['Authorization'],
+    maxAge: 3600,
   });
 
   // Rate limiting
