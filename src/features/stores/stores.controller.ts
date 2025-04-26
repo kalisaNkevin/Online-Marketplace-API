@@ -11,6 +11,7 @@ import {
   ForbiddenException,
   UnauthorizedException,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -29,7 +30,6 @@ import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { StoreResponseDto } from './dto/store-response.dto';
 
-
 @ApiTags('Stores')
 @Controller('stores')
 @UseGuards(JwtAuthGuard)
@@ -38,8 +38,8 @@ export class StoresController {
 
   @Post()
   @Roles([Role.SELLER])
-  @ApiBearerAuth('JWT-auth')
   @UseGuards(RolesGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new store' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -50,12 +50,10 @@ export class StoresController {
     @Request() req,
     @Body() createStoreDto: CreateStoreDto,
   ): Promise<Store> {
-    // Explicitly get userId from the authenticated user
-    const userId = req.user.id;
-    if (!userId) {
-      throw new UnauthorizedException('User not authenticated');
+    if (req.user.role !== Role.SELLER) {
+      throw new ForbiddenException('Only sellers can create stores');
     }
-    return this.storesService.create(userId, createStoreDto);
+    return this.storesService.create(req.user.id, createStoreDto);
   }
 
   @Get()
@@ -79,17 +77,12 @@ export class StoresController {
   @UseGuards(RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: "Get seller's own store" })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns the store owned by the current seller',
-    type: StoreResponseDto
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Store not found for this seller'
-  })
   async findMyStore(@Request() req): Promise<StoreResponseDto> {
-    return this.storesService.findByOwnerId(req.user.id);
+    const stores = await this.storesService.findByOwnerId(req.user.id);
+    if (!stores || stores.length === 0) {
+      throw new NotFoundException('Store not found');
+    }
+    return stores[0];
   }
 
   @Get(':id')

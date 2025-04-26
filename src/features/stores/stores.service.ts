@@ -29,25 +29,6 @@ export interface StoreMetrics {
 export class StoresService {
   constructor(private prisma: PrismaService) {}
 
-  private buildWhereClause(
-    search?: string,
-    userId?: string,
-  ): Prisma.StoreWhereInput {
-    return {
-      AND: [
-        userId ? { ownerId: userId } : {},
-        search
-          ? {
-              OR: [
-                { name: { contains: search, mode: 'insensitive' } },
-                { description: { contains: search, mode: 'insensitive' } },
-              ],
-            }
-          : {},
-      ],
-    };
-  }
-
   private async validateStoreOwnership(
     storeId: string,
     userId: string,
@@ -61,11 +42,25 @@ export class StoresService {
     return store;
   }
 
+  private calculateStoreMetrics(store: any): StoreMetrics {
+    const totalProducts = store.products?.length || 0;
+    const ratings =
+      store.products?.map((p) => p.averageRating).filter(Boolean) || [];
+    const averageProductRating = ratings.length
+      ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+      : 0;
+
+    return {
+      totalProducts,
+      averageProductRating,
+    };
+  }
+
   async create(userId: string, createStoreDto: CreateStoreDto): Promise<Store> {
     // First verify the user exists and is a seller
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true }
+      select: { id: true, role: true },
     });
 
     if (!user) {
@@ -85,36 +80,31 @@ export class StoresService {
         ...(logoUrl && { logoUrl }),
         owner: {
           connect: {
-            id: user.id // Use verified user.id
-          }
-        }
+            id: user.id, // Use verified user.id
+          },
+        },
       },
       include: {
         owner: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     });
   }
 
-  async findAll(query: QueryStoreDto): Promise<{
-    data: StoreResponseDto[];
-    pagination: {
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    };
-  }> {
+  async findAll(
+    query: QueryStoreDto,
+  ): Promise<PaginatedResponse<StoreResponseDto>> {
     const { page = 1, limit = 10 } = query;
+    const skip = (page - 1) * limit;
 
     const [stores, total] = await Promise.all([
       this.prisma.store.findMany({
-        skip: (page - 1) * limit,
+        skip,
         take: limit,
         select: {
           id: true,
@@ -125,7 +115,7 @@ export class StoresService {
           updatedAt: true,
           owner: {
             select: {
-              id: true,
+              id: true, // Include owner ID
               name: true,
               email: true,
             },
@@ -138,7 +128,11 @@ export class StoresService {
               averageRating: true,
             },
           },
-
+          _count: {
+            select: {
+              products: true,
+            },
+          },
         },
       }),
       this.prisma.store.count(),
@@ -147,6 +141,7 @@ export class StoresService {
     // Transform the data to match StoreResponseDto
     const transformedStores = stores.map((store) => ({
       ...store,
+      metrics: this.calculateStoreMetrics(store),
       products: store.products.map((product) => ({
         ...product,
         price: product.price.toNumber(),
@@ -206,12 +201,9 @@ export class StoresService {
     return { message: 'Store deleted successfully' };
   }
 
-  async findByOwnerId(userId: string): Promise<StoreResponseDto> {
-    // Find store where ownerId matches the authenticated user's ID
-    const store = await this.prisma.store.findFirst({
-      where: {
-        ownerId: userId
-      },
+  async findByOwnerId(userId: string): Promise<StoreResponseDto[]> {
+    const stores = await this.prisma.store.findMany({
+      where: { ownerId: userId },
       include: {
         owner: {
           select: {
@@ -220,51 +212,24 @@ export class StoresService {
             email: true,
           },
         },
-        products: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            averageRating: true,
-            thumbnail: true,
-            createdAt: true,
-            updatedAt: true
-          }
-        },
+        products: true,
         _count: {
           select: {
-            products: true
-          }
-        }
-      }
+            products: true,
+          },
+        },
+      },
     });
 
-    if (!store) {
-      throw new NotFoundException(`No store found for user ID: ${userId}`);
-    }
-
-    // Transform the response to match StoreResponseDto format
-    return {
-      id: store.id,
-      name: store.name,
-      description: store.description,
-      logoUrl: store.logoUrl,
-      createdAt: store.createdAt,
-      updatedAt: store.updatedAt,
-      owner: {
-        id: store.owner.id,
-        name: store.owner.name,
-        email: store.owner.email,
-      },
+    return stores.map((store) => ({
+      ...store,
+      metrics: this.calculateStoreMetrics(store),
       products: store.products.map((product) => ({
         id: product.id,
         name: product.name,
         price: product.price.toNumber(),
         averageRating: product.averageRating?.toNumber(),
-        thumbnail: product.thumbnail,
-        createdAt: product.createdAt,
-        updatedAt: product.updatedAt,
       })),
-    };
+    }));
   }
 }

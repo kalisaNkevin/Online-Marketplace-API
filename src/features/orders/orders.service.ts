@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import {
@@ -10,6 +11,8 @@ import {
   OrderStatus,
   PaymentStatus,
   PaymentMethod,
+  Order,
+  ProductSize,
 } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
@@ -18,15 +21,16 @@ import { OrderEntity } from './entities/order.entity';
 import { PaymentDto } from './dto/payment.dto';
 import { CreateReviewDto } from '../products/dto/create-review.dto';
 import { PaginatedOrdersResponse } from './interfaces/paginated-orders-response.interface';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { ClientProxy } from '@nestjs/microservices';
+import { CreateProductDto } from '../products/dto/create-product.dto';
 
 const orderInclude = {
   items: {
     include: {
       product: {
-        select: {
-          id: true,
-          name: true,
-          price: true,
+        include: {
           store: {
             select: {
               id: true,
@@ -50,7 +54,107 @@ const orderInclude = {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectQueue('orders') private readonly ordersQueue: Queue,
+    @Inject('ORDERS_SERVICE') private readonly ordersClient: ClientProxy,
+  ) {}
+
+  async create(
+    userId: string,
+    createOrderDto: CreateOrderDto,
+  ): Promise<OrderEntity> {
+    return this.prisma.$transaction(async (tx) => {
+      const productIds = createOrderDto.items.map((item) => item.productId);
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } },
+      });
+
+      if (products.length !== productIds.length) {
+        throw new BadRequestException('One or more products not found');
+      }
+
+      let orderTotal = new Prisma.Decimal(0);
+      const orderItems = createOrderDto.items.map((item) => {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) {
+          throw new BadRequestException(`Product ${item.productId} not found`);
+        }
+
+        const price = product.discount
+          ? product.price.minus(product.discount)
+          : product.price;
+
+        const itemTotal = price.mul(new Prisma.Decimal(item.quantity));
+        orderTotal = orderTotal.plus(itemTotal);
+
+        return {
+          productId: item.productId,
+          quantity: item.quantity,
+          size: item.size,
+          price,
+          priceAtPurchase: price,
+          total: itemTotal,
+        };
+      });
+
+      const newOrder = await tx.order.create({
+        data: {
+          user: { connect: { id: userId } },
+          status: OrderStatus.PENDING,
+          total: orderTotal,
+          paymentStatus: PaymentStatus.PENDING,
+          paymentMethod: PaymentMethod.CARD,
+          shippingAddress: JSON.parse(
+            JSON.stringify(createOrderDto.shippingAddress),
+          ),
+          items: {
+            create: orderItems,
+          },
+        },
+        include: orderInclude,
+      });
+
+      // Update product quantities
+      await Promise.all(
+        orderItems.map((item) =>
+          tx.product.update({
+            where: { id: item.productId },
+            data: { quantity: { decrement: item.quantity } },
+          }),
+        ),
+      );
+
+      // Queue processing
+      await this.ordersQueue.add(
+        'process-order',
+        {
+          orderId: newOrder.id,
+          userId,
+        },
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        },
+      );
+
+      // Emit event
+      this.ordersClient.emit('order_created', {
+        orderId: newOrder.id,
+        userId,
+        items: newOrder.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          size: item.size,
+        })),
+      });
+
+      return this.transformOrderResponse(newOrder);
+    });
+  }
 
   async createOrder(
     userId: string,
@@ -134,6 +238,21 @@ export class OrdersService {
         });
       }
 
+      // Add to processing queue
+      await this.ordersQueue.add(
+        'process-order',
+        {
+          orderId: newOrder.id,
+        },
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        },
+      );
+
       return newOrder;
     });
 
@@ -143,6 +262,13 @@ export class OrdersService {
     //   JSON.stringify(order),
     //   3600,
     // );
+
+    // Send to queue for processing
+    this.ordersClient.emit('order_created', {
+      orderId: order.id,
+      userId,
+      items: createOrderDto.items,
+    });
 
     return this.transformOrderResponse(order);
   }
@@ -363,45 +489,47 @@ export class OrdersService {
     }
   }
 
-  private transformOrderResponse(order: any): OrderEntity {
+  private transformOrderResponse(
+    order: Prisma.OrderGetPayload<{ include: typeof orderInclude }>,
+  ): OrderEntity {
     return {
       id: order.id,
       userId: order.userId,
       status: order.status,
+      statusMessage: '',
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod,
       paymentReference: order.paymentReference,
-      total: order.total.toString(),
-      items:
-        order.items?.map((item) => ({
-          id: item.id,
-          productId: item.productId,
-          productName: item.product?.name,
-          quantity: item.quantity,
-          price: item.price.toString(),
-          priceAtPurchase: item.priceAtPurchase?.toString(),
-          total: item.total.toString(),
-          size: item.size,
-          store: item.product?.store
-            ? {
-                id: item.product.store.id,
-                name: item.product.store.name,
-              }
-            : null,
-        })) || [],
-      shippingAddress: order.shippingAddress || {},
+      total: order.total,
+      orderItems: order.items.map((item) => ({
+        id: item.id,
+        orderId: order.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        size: item.size as ProductSize, // Add type assertion here
+        price: item.price,
+        priceAtPurchase: item.priceAtPurchase,
+        total: item.total,
+        product: item.product && {
+          id: item.product.id,
+          name: item.product.name,
+          store: item.product.store && {
+            id: item.product.store.id,
+            name: item.product.store.name,
+          },
+        },
+      })),
+      shippingAddress: order.shippingAddress,
+      user: {
+        id: order.user.id,
+        name: order.user.name,
+        email: order.user.email,
+        phoneNumber: order.user.phoneNumber,
+      },
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
-      completedAt: order.completedAt || null,
-      cancelledAt: order.cancelledAt || null,
-      user: order.user
-        ? {
-            id: order.user.id,
-            name: order.user.name,
-            email: order.user.email,
-            phoneNumber: order.user.phoneNumber,
-          }
-        : null,
+      completedAt: order.completedAt || undefined,
+      cancelledAt: order.cancelledAt || undefined,
       reviews: order.reviews || [],
     };
   }
@@ -436,10 +564,17 @@ export class OrdersService {
     orderId: string,
     storeId: string,
   ): Promise<OrderEntity> {
-    const order = await this.getOrderById(orderId);
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: orderInclude,
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
 
     const hasStoreItems = order.items.some(
-      (item) => item.productId === storeId,
+      (item) => item.product?.store?.id === storeId,
     );
 
     if (!hasStoreItems) {
@@ -453,13 +588,20 @@ export class OrdersService {
     orderId: string,
     userId: string,
   ): Promise<OrderEntity> {
-    const order = await this.getOrderById(orderId);
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: orderInclude,
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
 
     if (order.user?.id !== userId) {
       throw new ForbiddenException('Order does not belong to you');
     }
 
-    return order;
+    return this.transformOrderResponse(order);
   }
 
   async addReview(
@@ -543,7 +685,9 @@ export class OrdersService {
   ): Promise<OrderEntity> {
     const order = await this.getOrderById(orderId);
 
-    const hasStoreItems = order.items.some((item) => item.store.id === storeId);
+    const hasStoreItems = order.orderItems.some(
+      (item) => item.product.store.id === storeId,
+    );
 
     if (!hasStoreItems) {
       throw new ForbiddenException('Order does not belong to your store');

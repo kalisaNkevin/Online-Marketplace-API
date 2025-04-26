@@ -1,36 +1,46 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
+import {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  ProductSize,
+} from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export class OrderItemEntity {
   @ApiProperty()
   id: string;
 
   @ApiProperty()
-  productId: string;
+  orderId: string;
 
   @ApiProperty()
-  productName: string;
+  productId: string;
 
   @ApiProperty()
   quantity: number;
 
   @ApiProperty()
-  price: string;
+  size: ProductSize;
 
   @ApiProperty()
-  priceAtPurchase: string;
+  price: Decimal;
 
   @ApiProperty()
-  total: string;
+  priceAtPurchase: Decimal;
 
-  @ApiProperty({ required: false })
-  size?: string;
+  @ApiProperty()
+  total: Decimal;
 
   @ApiProperty({ required: false, type: Object, nullable: true })
-  store?: {
+  product?: {
     id: string;
     name: string;
-  } | null;
+    store?: {
+      id: string;
+      name: string;
+    };
+  };
 }
 
 export class OrderUserEntity {
@@ -57,26 +67,29 @@ export class OrderEntity {
   @ApiProperty({ enum: OrderStatus })
   status: OrderStatus;
 
+  @ApiProperty({ required: false, nullable: true })
+  statusMessage?: string;
+
   @ApiProperty({ enum: PaymentStatus })
   paymentStatus: PaymentStatus;
 
   @ApiProperty({ enum: PaymentMethod })
   paymentMethod: PaymentMethod;
 
-  @ApiProperty()
-  paymentReference: string;
+  @ApiProperty({ required: false, nullable: true })
+  paymentReference?: string;
 
   @ApiProperty()
-  total: string;
+  total: Decimal;
 
   @ApiProperty({ type: [OrderItemEntity] })
-  items: OrderItemEntity[];
+  orderItems: OrderItemEntity[];
 
-  @ApiProperty({ 
-    type: 'object', 
-    additionalProperties: true 
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
   })
-  shippingAddress: Record<string, any>;
+  shippingAddress: any; 
 
   @ApiProperty()
   createdAt: Date;
@@ -90,9 +103,14 @@ export class OrderEntity {
   @ApiProperty({ required: false, nullable: true })
   cancelledAt?: Date | null;
 
-  @ApiProperty({ type: () => OrderUserEntity, nullable: true })
-  user: OrderUserEntity | null;
+  @ApiProperty({ required: false, type: Object, nullable: true })
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    phoneNumber?: string;
+  };
 
-  @ApiProperty({ type: [Object] })
-  reviews: any[];
+  @ApiProperty({ required: false, type: Array, nullable: true })
+  reviews?: any[];
 }

@@ -33,10 +33,21 @@ describe('MailService', () => {
     mailerService = module.get<MailerService>(MailerService);
   });
 
+  afterAll(async () => {
+    // Close any open handles
+    await new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        clearTimeout(timeout);
+        resolve(true);
+      }, 500);
+      timeout.unref();
+    });
+  });
+
   describe('sendUserConfirmation', () => {
     it('should send welcome email successfully', async () => {
       const user = {
-        email: 'test@example.com',
+        email: 'support@jabocollection.com',
         name: 'Test User',
       };
       const token = 'verification-token';
@@ -56,15 +67,42 @@ describe('MailService', () => {
 
     it('should handle mailer errors', async () => {
       const user = {
-        email: 'test@example.com',
+        email: 'support@jabocollection.com',
         name: 'Test User',
       };
 
-      jest.spyOn(mailerService, 'sendMail').mockRejectedValue(new Error('Failed to send confirmation email'));
+      jest
+        .spyOn(mailerService, 'sendMail')
+        .mockRejectedValue(new Error('Failed to send confirmation email'));
 
       await expect(
         mailService.sendUserConfirmation(user as any, 'token'),
       ).rejects.toThrow('Failed to send confirmation email');
+    });
+  });
+
+  describe('sendConfirmationEmail', () => {
+    it('should handle failed email sending gracefully', async () => {
+      const email = 'support@jabocollection.com';
+      const token = 'test-token';
+
+      // Mock the mailerService to simulate failure
+      jest
+        .spyOn(mailerService, 'sendMail')
+        .mockRejectedValue(new Error('Failed to send confirmation email'));
+
+      // Use expect().rejects instead of try-catch for cleaner test
+      await expect(
+        mailService.sendUserConfirmation(
+          {
+            email,
+            name: 'Test User',
+          } as any,
+          token,
+        ),
+      ).rejects.toThrow('Failed to send confirmation email');
+
+      expect(mailerService.sendMail).toHaveBeenCalled();
     });
   });
 });

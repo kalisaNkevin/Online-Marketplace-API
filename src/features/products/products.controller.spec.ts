@@ -6,10 +6,12 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ForbiddenException, Query } from '@nestjs/common';
 import { Role, ProductSize } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaService } from '@/database/prisma.service';
 
 describe('ProductsController', () => {
   let controller: ProductsController;
   let service: jest.Mocked<Partial<ProductsService>>;
+  let prisma: PrismaService;
 
   const mockProduct = {
     id: '1',
@@ -53,6 +55,31 @@ describe('ProductsController', () => {
       delete: jest.fn(),
     };
 
+    const mockPrismaService = {
+      product: {
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      store: {
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      category: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ProductsController],
       providers: [
@@ -60,18 +87,35 @@ describe('ProductsController', () => {
           provide: ProductsService,
           useValue: mockProductsService,
         },
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
       ],
     }).compile();
 
     controller = module.get<ProductsController>(ProductsController);
     service = module.get(ProductsService);
+    prisma = module.get(PrismaService);
   });
 
   describe('create', () => {
     it('should create a product for sellers', async () => {
       const req = {
-        user: { sub: '1', role: Role.SELLER, storeId: '1' },
+        user: { id: '1', role: Role.SELLER },
       };
+
+      const mockStore = {
+        id: '1',
+        name: 'Test Store',
+        ownerId: '1',
+      };
+
+      const mockCategories = [{ id: '1', name: 'Category 1' }];
+
+      (prisma.store.findFirst as jest.Mock).mockResolvedValue(mockStore);
+      (prisma.category.findMany as jest.Mock).mockResolvedValue(mockCategories);
+      service.create.mockResolvedValue(mockProduct);
 
       const createProductDto: CreateProductDto = {
         name: 'Test Product',
@@ -81,28 +125,27 @@ describe('ProductsController', () => {
         variants: [{ size: ProductSize.M, quantity: 5 }],
       };
 
-      service.create.mockResolvedValue(mockProduct);
-
       const result = await controller.create(req, createProductDto);
 
       expect(result).toBeDefined();
       expect(service.create).toHaveBeenCalledWith(
-        req.user.storeId,
+        mockStore.id,
         createProductDto,
       );
     });
 
     it('should throw ForbiddenException if seller has no store', async () => {
       const req = {
-        user: { sub: '1', role: Role.SELLER },
+        user: { id: '1', role: Role.SELLER },
       };
+
+      (prisma.store.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
         controller.create(req, {} as CreateProductDto),
       ).rejects.toThrow(ForbiddenException);
     });
   });
-
 
   describe('getProductReviews', () => {
     it('should get reviews for a product', async () => {

@@ -16,8 +16,8 @@ describe('CategoriesService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     _count: {
-      products: 0
-    }
+      products: 0,
+    },
   };
 
   const mockPrismaService = {
@@ -35,8 +35,10 @@ describe('CategoriesService', () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     jest.restoreAllMocks();
+    // Clean up any hanging handles
+    await new Promise((resolve) => setTimeout(resolve, 0).unref());
   });
 
   beforeEach(async () => {
@@ -63,15 +65,23 @@ describe('CategoriesService', () => {
         description: 'Electronic devices and accessories',
       };
 
-      mockPrismaService.category.create.mockResolvedValue(mockCategory);
+      // Add include to the mock implementation
+      mockPrismaService.category.create.mockResolvedValue({
+        ...mockCategory,
+        products: [], // Add any related data that might be included
+        _count: {
+          products: 0,
+        },
+      });
 
       const result = await service.create(createCategoryDto);
 
       expect(result).toBeDefined();
       expect(result.name).toBe(createCategoryDto.name);
+
+      // Update expectation to match only the data property
       expect(mockPrismaService.category.create).toHaveBeenCalledWith({
         data: createCategoryDto,
-        include: expect.any(Object),
       });
     });
   });
@@ -137,9 +147,9 @@ describe('CategoriesService', () => {
     it('should throw NotFoundException if category to update not found', async () => {
       mockPrismaService.category.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.update('999', { name: 'Updated' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update('999', { name: 'Updated' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

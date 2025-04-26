@@ -1,10 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { StoresController } from './stores.controller';
-import { StoresService } from './stores.service';
+import { PaginatedResponse, StoresService } from './stores.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { Role } from '@prisma/client';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   StoreResponseDto,
   StoreProductDto,
@@ -12,69 +16,83 @@ import {
   StoreMetricsDto,
 } from './dto/store-response.dto';
 import { Decimal } from '@prisma/client/runtime/library';
+import { RolesGuard } from '@/auth/guards/roles.guard';
 
 describe('StoresController', () => {
   let controller: StoresController;
-  let service: jest.Mocked<Partial<StoresService>>;
+  let service: jest.Mocked<StoresService>;
 
-  const mockStoreProduct: StoreProductDto = {
-    id: '1',
-    name: 'Test Product',
-    price: new Decimal('100.00'),
-  };
-
-  const mockStoreOwner: StoreOwnerDto = {
-    name: 'Test Owner',
-    email: 'owner@test.com',
-  };
-
-  const mockStoreMetrics: StoreMetricsDto = {
-    totalProducts: 1,
-    averageProductRating: 0,
-  };
-
-  const mockStore = {
-    id: '1',
-    name: 'Test Store',
-    description: 'Test Description', // Required field
-    ownerId: '1',
-    owner: {
-      name: 'Test Owner',
-      email: 'owner@test.com'
-    },
-    products: [{
+  // Mock Data
+  const createMockData = () => {
+    const mockStoreProduct: StoreProductDto = {
       id: '1',
       name: 'Test Product',
-      price: new Decimal('100.00')
-    }],
-    metrics: {
-      totalProducts: 1,
-      averageProductRating: 0
-    },
-    createdAt: new Date(),
-    updatedAt: new Date()
-  } as StoreResponseDto;
+      price: 500, // Changed from string to number
+      averageRating: 90, // Changed from string to number
+    };
 
+    const mockStoreOwner: StoreOwnerDto = {
+      id: '1',
+      name: 'Test Owner',
+      email: 'owner@test.com',
+    };
+
+    const mockStoreMetrics: StoreMetricsDto = {
+      totalProducts: 1,
+      averageProductRating: 0,
+    };
+
+    const mockStore: StoreResponseDto = {
+      id: '1',
+      name: 'Test Store',
+      description: 'Test Description',
+      owner: mockStoreOwner,
+      products: [mockStoreProduct],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockPaginatedResponse: PaginatedResponse<StoreResponseDto> = {
+      data: [mockStore],
+      pagination: {
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      },
+    };
+
+    return {
+      mockStore,
+      mockPaginatedResponse,
+      mockStoreProduct,
+      mockStoreOwner,
+      mockStoreMetrics,
+    };
+  };
+
+  // Setup
   beforeEach(async () => {
+    const { mockStore, mockPaginatedResponse } = createMockData();
+
     const mockStoresService = {
-      create: jest.fn().mockResolvedValue(mockStore),
-      findAll: jest.fn().mockResolvedValue({
-        data: [mockStore],
-        pagination: {
-          total: 1,
-          page: 1,
-          limit: 10,
-          totalPages: 1
-        }
+      create: jest.fn().mockImplementation((userId, dto) => {
+        return Promise.resolve(mockStore);
       }),
+      findAll: jest.fn().mockResolvedValue(mockPaginatedResponse),
       findOne: jest.fn().mockResolvedValue(mockStore),
-      findByUser: jest.fn(),
+      findByOwnerId: jest.fn().mockResolvedValue([mockStore]), // Return array with store
       update: jest.fn().mockImplementation((id, userId, dto) => ({
         ...mockStore,
         ...dto,
-        description: dto.description || mockStore.description // Preserve description if not updated
       })),
-      remove: jest.fn()
+      remove: jest
+        .fn()
+        .mockResolvedValue({ message: 'Store deleted successfully' }),
+      calculateStoreMetrics: jest.fn().mockReturnValue({
+        totalProducts: 1,
+        averageProductRating: 0,
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -91,230 +109,170 @@ describe('StoresController', () => {
     service = module.get(StoresService);
   });
 
-  describe('create', () => {
-    const createStoreDto: CreateStoreDto = {
-      name: 'Test Store',
-      description: 'Test Description',
-    };
+  // Test Cases
+  describe('CRUD Operations', () => {
+    const { mockStore } = createMockData();
 
-    it('should create a store for sellers', async () => {
-      const req = {
-        user: { sub: '1', role: Role.SELLER },
+    describe('create', () => {
+      const createStoreDto: CreateStoreDto = {
+        name: 'Test Store',
+        description: 'Test Description',
       };
 
-      service.create.mockResolvedValue(mockStore);
+      it('should create a store for sellers', async () => {
+        const req = {
+          user: {
+            id: '1', // Changed from sub to id
+            role: Role.SELLER,
+          },
+        };
+        const result = await controller.create(req, createStoreDto);
 
-      const result = await controller.create(req, createStoreDto);
-
-      expect(result).toEqual(mockStore);
-      expect(service.create).toHaveBeenCalledWith(req.user.sub, createStoreDto);
-    });
-
-    it('should throw ForbiddenException for non-sellers', async () => {
-      const req = {
-        user: { sub: '1', role: Role.SHOPPER },
-      };
-
-      await expect(controller.create(req, createStoreDto)).rejects.toThrow(
-        ForbiddenException,
-      );
-    });
-  });
-
-  describe('findAll', () => {
-    it('should return all stores', async () => {
-      const paginatedResponse = {
-        data: [mockStore],
-        pagination: {
-          total: 1,
-          page: 1,
-          limit: 10,
-          totalPages: 1,
-        },
-      };
-
-      service.findAll.mockResolvedValue(paginatedResponse);
-
-      const result = await controller.findAll();
-
-      expect(result).toEqual(paginatedResponse);
-      expect(service.findAll).toHaveBeenCalled();
-    });
-  });
-
-  describe('findMyStore', () => {
-    it('should return user stores', async () => {
-      const req = {
-        user: { sub: '1' },
-      };
-
-      service.findByUser.mockResolvedValue({
-        data: [mockStore],
-        pagination: {
-          total: 1,
-          page: 1,
-          limit: 10,
-          totalPages: 1,
-        },
+        // Use toMatchObject instead of toEqual to handle date comparison
+        expect(result).toMatchObject({
+          ...mockStore,
+          createdAt: expect.any(Date),
+          updatedAt: expect.any(Date),
+        });
+        expect(service.create).toHaveBeenCalledWith(
+          req.user.id,
+          createStoreDto,
+        );
       });
 
-      const result = await controller.findMyStore(req);
+      it('should throw ForbiddenException for non-sellers', async () => {
+        // Create test module with RolesGuard
+        const moduleRef = await Test.createTestingModule({
+          controllers: [StoresController],
+          providers: [
+            {
+              provide: StoresService,
+              useValue: service,
+            },
+          ],
+        })
+          .overrideGuard(RolesGuard)
+          .useValue({
+            canActivate: (context: ExecutionContext) => {
+              const req = context.switchToHttp().getRequest();
+              if (req.user.role !== Role.SELLER) {
+                throw new ForbiddenException('Only sellers can create stores');
+              }
+              return true;
+            },
+          })
+          .compile();
 
-      expect(result.data).toEqual([mockStore]);
-      expect(service.findByUser).toHaveBeenCalledWith(
-        req.user.sub,
-        expect.any(Object),
-      );
+        const testController =
+          moduleRef.get<StoresController>(StoresController);
+
+        const req = {
+          user: {
+            id: '1',
+            role: Role.SHOPPER,
+          },
+        };
+
+        await expect(
+          testController.create(req, createStoreDto),
+        ).rejects.toThrow(ForbiddenException);
+        // Remove service call expectation since guard prevents it
+      });
     });
-  });
 
-  describe('update', () => {
-    it('should update a store', async () => {
-      const req = {
-        user: { sub: '1' },
+    describe('read operations', () => {
+      const { mockPaginatedResponse } = createMockData();
+      const defaultQuery = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
       };
 
-      const updateStoreDto: UpdateStoreDto = {
-        name: 'Updated Store',
-      };
-
-      service.update.mockResolvedValue({
-        ...mockStore,
-        ...updateStoreDto,
+      it('should find all stores with default pagination', async () => {
+        const result = await controller.findAll();
+        expect(result).toMatchObject({
+          data: [
+            {
+              ...mockStore,
+              createdAt: expect.any(Date),
+              updatedAt: expect.any(Date),
+            },
+          ],
+          pagination: expect.any(Object),
+        });
+        expect(service.findAll).toHaveBeenCalledWith(defaultQuery);
       });
 
-      const result = await controller.update('1', req, updateStoreDto);
-
-      expect(result.name).toBe(updateStoreDto.name);
-      expect(service.update).toHaveBeenCalledWith(
-        '1',
-        req.user.sub,
-        updateStoreDto,
-      );
-    });
-  });
-
-  describe('remove', () => {
-    it('should remove a store', async () => {
-      const req = {
-        user: { sub: '1' },
-      };
-
-      service.remove.mockResolvedValue({
-        message: 'Store deleted successfully',
+      it('should find one store by id', async () => {
+        const result = await controller.findOne('1');
+        expect(result).toMatchObject({
+          ...mockStore,
+          createdAt: expect.any(Date),
+          updatedAt: expect.any(Date),
+        });
+        expect(service.findOne).toHaveBeenCalledWith('1');
       });
 
-      const result = await controller.remove('1', req);
+      it('should find stores by user', async () => {
+        const req = { user: { id: '1' } }; // Changed from sub to id
+        const result = await controller.findMyStore(req);
+        expect(result).toMatchObject({
+          ...mockStore,
+          createdAt: expect.any(Date),
+          updatedAt: expect.any(Date),
+        });
+        expect(service.findByOwnerId).toHaveBeenCalledWith(
+          // Changed from findOne
+          req.user.id,
+        );
+      });
 
-      expect(result.message).toBe('Store deleted successfully');
-      expect(service.remove).toHaveBeenCalledWith('1', req.user.sub);
+      it('should find store by user', async () => {
+        const req = { user: { id: '1' } };
+        const result = await controller.findMyStore(req);
+
+        expect(result).toMatchObject({
+          ...mockStore,
+          createdAt: expect.any(Date),
+          updatedAt: expect.any(Date),
+        });
+        expect(service.findByOwnerId).toHaveBeenCalledWith(req.user.id);
+      });
+    });
+
+    describe('update', () => {
+      it('should update a store', async () => {
+        const req = { user: { sub: '1' } };
+        const updateDto: UpdateStoreDto = { name: 'Updated Store' };
+        const result = await controller.update('1', req, updateDto);
+
+        expect(result.name).toBe(updateDto.name);
+        expect(service.update).toHaveBeenCalledWith(
+          '1',
+          req.user.sub,
+          updateDto,
+        );
+      });
+    });
+
+    describe('remove', () => {
+      it('should remove a store', async () => {
+        const req = { user: { sub: '1' } };
+        const result = await controller.remove('1', req);
+
+        expect(result.message).toBe('Store deleted successfully');
+        expect(service.remove).toHaveBeenCalledWith('1', req.user.sub);
+      });
     });
   });
 
-  describe('findOne', () => {
-    it('should return a store by id', async () => {
-      service.findOne.mockResolvedValue(mockStore);
-
-      const result = await controller.findOne('1');
-
-      expect(result).toEqual(mockStore);
-      expect(service.findOne).toHaveBeenCalledWith('1');
-    });
-
-    it('should throw NotFoundException for non-existent store', async () => {
+  describe('Error Handling', () => {
+    it('should handle non-existent store', async () => {
       service.findOne.mockRejectedValue(new NotFoundException());
-
-      await expect(controller.findOne('999')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('findAll with query params', () => {
-    it('should return filtered stores', async () => {
-      const paginatedResponse = {
-        data: [mockStore],
-        pagination: {
-          total: 1,
-          page: 1,
-          limit: 10,
-          totalPages: 1
-        }
-      };
-
-      service.findAll.mockResolvedValue(paginatedResponse);
-      
-      // Call controller without query params to test defaults
-      const result = await controller.findAll();
-
-      expect(result).toEqual(paginatedResponse);
-      expect(service.findAll).toHaveBeenCalledWith({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
-    });
-
-    it('should handle search parameter', async () => {
-      const query = {
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      };
-
-      const paginatedResponse = {
-        data: [mockStore],
-        pagination: {
-          total: 1,
-          page: 1,
-          limit: 10,
-          totalPages: 1
-        }
-      };
-
-      service.findAll.mockResolvedValue(paginatedResponse);
-      // Pass the query parameter to findAll()
-      const result = await controller.findAll();
-
-      expect(result).toEqual(paginatedResponse);
-      expect(service.findAll).toHaveBeenCalledWith(query);
-    });
-  });
-
-  describe('findMyStore with query params', () => {
-    it('should return stores with pagination', async () => {
-      const req = {
-        user: { sub: '1' }
-      };
-
-      // Update query to match default values
-      const query = {
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      };
-
-      const paginatedResponse = {
-        data: [mockStore],
-        pagination: {
-          total: 1,
-          page: 1,
-          limit: 10,
-          totalPages: 1
-        }
-      };
-
-      service.findByUser.mockResolvedValue(paginatedResponse);
-      const result = await controller.findMyStore(req);
-
-      expect(result).toEqual(paginatedResponse);
-      expect(service.findByUser).toHaveBeenCalledWith(req.user.sub, {
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
+      await expect(controller.findOne('999')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

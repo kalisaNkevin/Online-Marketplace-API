@@ -64,40 +64,20 @@ async function bootstrap() {
     }),
   );
 
-  // Update CORS configuration for subdomains
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'https://jabocollection.com',
-    'https://*.jabocollection.com', // Wildcard for all subdomains
-    process.env.FRONTEND_URL,
-  ].filter(Boolean);
-
+  // CORS configuration
   app.enableCors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        origin.endsWith('jabocollection.com')
-      ) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-    allowedHeaders: [
-      'Origin',
-      'X-Requested-With',
-      'Content-Type',
-      'Accept',
-      'Authorization',
-      'Access-Control-Allow-Credentials',
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'https://jabocollection.com',
+      /\.jabocollection\.com$/,
     ],
-    exposedHeaders: ['Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
+  // Rate limiting
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000,
@@ -108,6 +88,7 @@ async function bootstrap() {
     }),
   );
 
+  // Global pipes
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -118,6 +99,7 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('Jabo Collection API')
     .setVersion('1.0')
@@ -140,7 +122,7 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
 
-  // Enable CORS for Swagger UI
+  // Swagger UI CORS configuration
   app.use('/api-docs', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header(

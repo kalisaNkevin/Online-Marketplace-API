@@ -8,11 +8,17 @@ export class StoreProductDto {
   @ApiProperty({ example: 'Nike Air Max' })
   name: string;
 
-  @ApiProperty({ example: 129.99 })
-  price: Decimal;
+  @ApiProperty({ example: 90 })
+  price: number ;
+
+  @ApiProperty({ example: 90 })
+  averageRating?: number;
 }
 
 export class StoreOwnerDto {
+  @ApiProperty({ example: 'owner-123' })
+  id: string;
+
   @ApiProperty({ example: 'John Doe' })
   name: string;
 
@@ -55,7 +61,6 @@ export class StoreResponseDto {
     price: number;
     averageRating?: number;
   }>;
-
 
   @ApiProperty()
   createdAt: Date;
