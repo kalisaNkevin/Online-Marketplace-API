@@ -2,7 +2,7 @@ services:
   - type: web
     name: online-marketplace-api
     runtime: node
-    buildCommand: npx prisma generate && npm ci && npm run build
+    buildCommand: npx prisma generate && npm install && npm run build
     startCommand: npx prisma migrate deploy && npx prisma db seed && npm run start:prod
     envVars:
       - key: NODE_ENV
