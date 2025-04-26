@@ -67,8 +67,7 @@ async function bootstrap() {
   // CORS configuration
   app.enableCors({
     origin: [
-      'http://localhost:3000',
-      'http://localhost:5173',
+      'https://www.jabocollection.com',
       'https://jabocollection.com',
       /\.jabocollection\.com$/,
     ],

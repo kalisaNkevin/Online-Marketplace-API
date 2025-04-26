@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Query, Res } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Res, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginUserDto } from './dto/login.dto';
@@ -13,6 +13,8 @@ import { ConfigService } from '@nestjs/config';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
@@ -101,8 +103,7 @@ export class AuthController {
   @Post('login')
   @ApiOperation({
     summary: 'Authenticate user',
-    description:
-      'Login with email and password to receive access and refresh tokens',
+    description: 'Login with email and password to receive access and refresh tokens',
   })
   @ApiBody({ type: LoginUserDto })
   @ApiResponse({
@@ -114,16 +115,32 @@ export class AuthController {
     status: 401,
     description: 'Unauthorized - Invalid credentials',
   })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid input data',
+  })
   async login(@Body() loginUserDto: LoginUserDto) {
-    const result = await this.authService.login(loginUserDto);
-    return {
-      statusCode: 200,
-      message: 'Login successful',
-      data: {
-        accessToken: result.token,
-        refreshToken: result.refreshToken,
-      },
-    };
+    try {
+      const result = await this.authService.login(loginUserDto);
+      return {
+        statusCode: 200,
+        message: 'Login successful',
+        data: {
+          accessToken: result.token,
+          refreshToken: result.refreshToken,
+        },
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      // Log the error but don't expose internal details
+      this.logger.error('Login error:', error);
+      throw new UnauthorizedException('Invalid credentials');
+    }
   }
 
   @Public()
