@@ -53,23 +53,18 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.14",
     "@nestjs/jwt": "^11.0.0",
-    "@nestjs/microservices": "^11.1.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.16",
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.1.1",
-    "@nestjs/terminus": "^11.0.0",
     "@prisma/client": "^6.6.0",
     "@sendgrid/mail": "^8.1.5",
-    "@types/bull": "^3.15.9",
-    "amqp-connection-manager": "^4.1.14",
-    "amqplib": "^0.10.7",
     "bcrypt": "^5.1.1",
     "bull": "^4.16.5",
     "cache-manager": "^6.4.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
-    "cloudinary": "^2.6.0",
+    "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.7",
     "express-rate-limit": "^7.5.0",
     "express-session": "^1.18.1",
@@ -123,15 +118,5 @@
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
-  },
-  "resolutions": {
-    "html-minifier": "4.0.0",
-    "cloudinary": "^2.6.0"
-  },
-  "overrides": {
-    "@nestjs-modules/mailer": {
-      "@nestjs/common": "^11.0.14",
-      "@nestjs/core": "^11.0.14"
-    }
   }
 }
