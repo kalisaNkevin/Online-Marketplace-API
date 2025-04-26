@@ -31,6 +31,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             adapter: new HandlebarsAdapter(),
             options: {
               strict: true,
+              minify: false,
             },
           },
           preview: false, // Disable preview to prevent local file opening
